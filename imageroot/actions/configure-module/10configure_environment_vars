@@ -9,6 +9,7 @@ import json
 import sys
 import agent
 import os
+import pwd
 
 # Try to parse the stdin as JSON.
 # If parsing fails, output everything to stderr
