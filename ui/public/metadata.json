@@ -1,0 +1,19 @@
+{
+  "name": "ns8-qbittorrent",
+  "description": {
+    "en": "My ns8-qbittorrent module"
+  },
+  "categories": [],
+  "authors": [
+    {
+      "name": "Name Surname",
+      "email": "author@yourmail.org"
+    }
+  ],
+  "docs": {
+    "documentation_url": "https://docs.ns8-qbittorrent.com/",
+    "bug_url": "https://github.com/NethServer/dev",
+    "code_url": "https://github.com/author/ns8-ns8-qbittorrent"
+  },
+  "source": "ghcr.io/nethserver/ns8-qbittorrent"
+}

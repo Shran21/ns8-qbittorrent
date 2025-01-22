@@ -1,0 +1,31 @@
+#
+# Copyright (C) 2022 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# This systemd unit starts a ns8-qbittorrent instance using Podman.
+# Most parts of this file come from podman-generate-systemd.
+#
+
+[Unit]
+Description=Podman ns8-qbittorrent.service
+Requires=qbittorrent-app.service 
+Before=qbittorrent-app.service 
+
+[Service]
+Environment=PODMAN_SYSTEMD_UNIT=%n
+EnvironmentFile=-%S/state/environment
+EnvironmentFile=-%S/state/volume-qbittorrent.env
+Restart=always
+TimeoutStopSec=70
+ExecStartPre=/bin/rm -f %t/ns8-qbittorrent.pid %t/ns8-qbittorrent.pod-id
+ExecStartPre=/usr/bin/podman pod create --infra-conmon-pidfile %t/ns8-qbittorrent.pid  --pod-id-file %t/ns8-qbittorrent.pod-id  --name ns8-qbittorrent  --publish 127.0.0.1:${TCP_PORT}:8080  --replace
+ExecStart=/usr/bin/podman pod start --pod-id-file %t/ns8-qbittorrent.pod-id
+ExecStop=/usr/bin/podman pod stop --ignore --pod-id-file %t/ns8-qbittorrent.pod-id -t 10
+ExecStopPost=/usr/bin/podman pod rm --ignore -f --pod-id-file %t/ns8-qbittorrent.pod-id
+PIDFile=%t/ns8-qbittorrent.pid
+Type=forking
+
+[Install]
+WantedBy=default.target

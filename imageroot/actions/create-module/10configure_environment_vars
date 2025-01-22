@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2022 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+import agent
+import os
+
+# Try to parse the stdin as JSON.
+# If parsing fails, output everything to stderr
+data = json.load(sys.stdin)
+
+# Function to generate random passwords
+def generate_random_password(length):
+    # Generate random bytes and convert them to a hexadecimal string
+    random_bytes = os.urandom(length)
+    password = random_bytes.hex()
+    return password[:length]
+
+# Generate MariaDB credentials
+MARIADB_ROOT_PASSWORD = generate_random_password(16)
+MARIADB_DATABASE = "ns8-qbittorrent"
+MARIADB_USER = "ns8-qbittorrent"
+MARIADB_PASSWORD = generate_random_password(16)
+
+# MariaDB environment configuration
+mariadb_config = {
+    "MARIADB_ROOT_PASSWORD": MARIADB_ROOT_PASSWORD,
+    "MARIADB_DATABASE": MARIADB_DATABASE,
+    "MARIADB_USER": MARIADB_USER,
+    "MARIADB_PASSWORD": MARIADB_PASSWORD
+}
+
+agent.write_envfile("database.env", mariadb_config)
+
+
+# Get the current rootless container user dynamically
+def get_current_user():
+    return pwd.getpwuid(os.getuid()).pw_name
+
+# Load or set the default directory
+current_user = get_current_user()
+DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
+DEFAULT_DOWNLOADS_DIR = "/data/qbittorrent/downloads"
+
+CONFIG_DIR = data.get("CONFIG_DIR", DEFAULT_CONFIG_DIR)
+DOWNLOADS_DIR = data.get("DOWNLOADS_DIR", DEFAULT_DOWNLOADS_DIR)
+
+# Ensure the configuration directory exists
+os.makedirs(CONFIG_DIR, exist_ok=True)
+
+# Ensure the downloads directory exists
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+
+# Optionally, set ownership and permissions for the directory
+os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
+os.chmod(CONFIG_DIR, 0o775)  # Example permission
+
+# os.chown(DOWNLOADS_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
+# os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
+
+# qBittorrent environment configuration
+qbittorrent_config = {
+    "DOWNLOADS_DIR": DOWNLOADS_DIR,
+    "CONFIG_DIR": CONFIG_DIR
+}
+
+agent.write_envfile("volume-qbittorrent.env", qbittorrent_config)
+
+# just before starting systemd unit
+# agent.dump_env()

@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2022 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+import json
+import sys
+import agent
+import os
+
+# Try to parse the stdin as JSON.
+# If parsing fails, output everything to stderr
+data = json.load(sys.stdin)
+
+# Get the current rootless container user dynamically
+def get_current_user():
+    return pwd.getpwuid(os.getuid()).pw_name
+
+# Load the default directory or use a fallback
+DEFAULT_DOWNLOADS_DIR = "/data/qbittorrent/downloads"
+current_user = get_current_user()
+DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
+
+
+# Retrieve variables from input JSON
+WEBUI_PORT = data.get("WEBUI_PORT")
+DOWNLOADS_DIR = data.get("DOWNLOADS_DIR", DEFAULT_DOWNLOADS_DIR)
+CONFIG_DIR = data.get("CONFIG_DIR", DEFAULT_CONFIG_DIR)
+
+
+# Ensure the configuration directory exists
+os.makedirs(CONFIG_DIR, exist_ok=True)
+
+# Ensure the downloads directory exists
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+
+# Set ownership and permissions (optional, depending on system requirements)
+os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
+os.chmod(CONFIG_DIR, 0o775)  # Example permission
+# os.chown(DOWNLOADS_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
+# os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
+
+# Create environment variables dictionary
+qbittorrent = {
+    "WEBUI_PORT": WEBUI_PORT,
+    "DOWNLOADS_DIR": DOWNLOADS_DIR,
+    "CONFIG_DIR": CONFIG_DIR
+}
+
+# Write the environment variables to the file
+agent.write_envfile("volume-qbittorrent.env", qbittorrent)

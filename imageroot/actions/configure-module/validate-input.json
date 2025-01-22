@@ -1,0 +1,45 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Configure ns8-qbittorrent",
+    "$id": "http://nethserver.org/json-schema/task/input/ns8-qbittorrent/configure-module",
+    "description": "Configure ns8-qbittorrent",
+    "examples": [
+        {
+            "host": "ns8-qbittorrent.domain.org",
+            "http2https": true,
+            "lets_encrypt": true,
+            "downloads_dir": "/custom/downloads/path"
+        }
+    ],
+    "type": "object",
+    "required": [
+        "host",
+        "http2https",
+        "lets_encrypt"
+    ],
+    "properties": {
+        "host": {
+            "type": "string",
+            "description": "Host name for the application, like 'ns8-qbittorrent.domain.org'",
+            "format": "hostname",
+            "pattern": "\\."
+        },
+        "lets_encrypt": {
+            "type": "boolean",
+            "title": "Let's Encrypt certificate",
+            "description": "Request a valid Let's Encrypt certificate."
+        },
+        "http2https": {
+            "type": "boolean",
+            "title": "HTTP to HTTPS redirection",
+            "description": "Redirect all the HTTP requests to HTTPS"
+        },
+        "downloads_dir": {
+            "type": "string",
+            "title": "Downloads Directory",
+            "description": "Custom path for qBittorrent downloads directory. If not specified, the default is '/data/qbittorrent/downloads'.",
+            "pattern": "^/.*",
+            "default": "/data/qbittorrent/downloads"
+        }
+    }
+}
