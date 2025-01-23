@@ -32,14 +32,14 @@ CONFIG_DIR = data.get("CONFIG_DIR", DEFAULT_CONFIG_DIR)
 
 
 # Ensure the configuration directory exists
-os.makedirs(CONFIG_DIR, exist_ok=True)
+#os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # Ensure the downloads directory exists
-os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+#os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 # Set ownership and permissions (optional, depending on system requirements)
-os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
-os.chmod(CONFIG_DIR, 0o775)  # Example permission
+#os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
+#os.chmod(CONFIG_DIR, 0o775)  # Example permission
 # os.chown(DOWNLOADS_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
 # os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
 

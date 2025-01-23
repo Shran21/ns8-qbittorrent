@@ -66,16 +66,16 @@
               <cv-accordion-item :open="toggleAccordion[0]">
                 <template slot="title">{{ $t("settings.advanced") }}</template>
                 <template slot="content">
-				 <cv-text-input
-				  :label="$t('settings.downloads_dir')"
-			   	  placeholder="/data/qbittorrent/downloads"
-				  v-model.trim="downloadsDir"
-				  class="mg-bottom"
-				  :invalid-message="$t(error.downloads_dir)"
-				  :disabled="loading.getConfiguration || loading.configureModule"
-				  ref="downloadsDir"
-				  >
-		         </cv-text-input>
+                   <cv-text-input
+                    :label="$t('settings.downloads_dir')"
+                    placeholder="/data/qbittorrent/downloads"
+                    v-model.trim="downloadsDir"
+                    class="mg-bottom"
+                    :invalid-message="$t(error.downloads_dir)"
+                    :disabled="loading.getConfiguration || loading.configureModule"
+                    ref="downloadsDir"
+                   >
+                 </cv-text-input>
                 </template>
               </cv-accordion-item>
             </cv-accordion>
@@ -133,7 +133,7 @@ export default {
       },
       urlCheckInterval: null,
       host: "",
-	  downloadsDir: "",
+      downloadsDir: "",
       isLetsEncryptEnabled: false,
       isHttpToHttpsEnabled: true,
       loading: {
@@ -144,7 +144,7 @@ export default {
         getConfiguration: "",
         configureModule: "",
         host: "",
-		downloads_dir: "",
+        downloads_dir: "",
         lets_encrypt: "",
         http2https: "",
       },
@@ -282,7 +282,7 @@ export default {
           action: taskAction,
           data: {
             host: this.host,
-			downloads_dir: this.downloadsDir,
+            downloads_dir: this.downloadsDir,
             lets_encrypt: this.isLetsEncryptEnabled,
             http2https: this.isHttpToHttpsEnabled,
           },
