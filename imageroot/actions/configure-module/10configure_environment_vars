@@ -26,9 +26,9 @@ DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
 
 
 # Retrieve variables from input JSON
-WEBUI_PORT = data.get("WEBUI_PORT")
-DOWNLOADS_DIR = data.get("DOWNLOADS_DIR", DEFAULT_DOWNLOADS_DIR)
-CONFIG_DIR = data.get("CONFIG_DIR", DEFAULT_CONFIG_DIR)
+WEBUI_PORT = data.get("webui_port")
+DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
+CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
 
 
 # Ensure the configuration directory exists
@@ -52,3 +52,7 @@ qbittorrent = {
 
 # Write the environment variables to the file
 agent.write_envfile("volume-qbittorrent.env", qbittorrent)
+
+#DEBUG
+#print("Received data:", data, file=sys.stderr)
+#print("Writing the following environment variables:", qbittorrent, file=sys.stderr)

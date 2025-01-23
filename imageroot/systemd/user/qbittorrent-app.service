@@ -19,7 +19,7 @@ TimeoutStopSec=70
 ExecStartPre=/bin/mkdir -p tmp
 ExecStartPre=/bin/rm -f %t/qbittorrent-app.pid %t/qbittorrent-app.ctr-id
 ExecStartPre=-runagent discover-smarthost
-ExecStart=/usr/bin/podman run --conmon-pidfile %t/qbittorrent-app.pid  --cidfile %t/qbittorrent-app.ctr-id --cgroups=no-conmon  --pod-id-file %t/ns8-qbittorrent.pod-id --replace -d --name  qbittorrent-app  --volume ${CONFIG_DIR}:/config:Z --volume ${DOWNLOADS_DIR}:/downloads:Z   --env qbittorrent.env  ${QBITTORRENT_IMAGE}  
+ExecStart=/usr/bin/podman run --conmon-pidfile %t/qbittorrent-app.pid  --cidfile %t/qbittorrent-app.ctr-id --cgroups=no-conmon  --pod-id-file %t/ns8-qbittorrent.pod-id --replace -d --name  qbittorrent-app  --volume ${CONFIG_DIR}:/config:Z --volume ${DOWNLOADS_DIR}:/downloads:Z  ${QBITTORRENT_IMAGE}  
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/qbittorrent-app.ctr-id -t 10
 ExecReload=/usr/bin/podman kill -s HUP qbittorrent-app
 SyslogIdentifier=%u
