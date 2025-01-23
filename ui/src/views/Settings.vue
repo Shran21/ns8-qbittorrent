@@ -212,7 +212,7 @@ export default {
     getConfigurationCompleted(taskContext, taskResult) {
       const config = taskResult.output;
       this.host = config.host;
-      this.downloadsDir = config.downloads_dir;
+      this.downloadsDir = config.DOWNLOADS_DIR || "/data/qbittorrent/downloads";
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isHttpToHttpsEnabled = config.http2https;
 

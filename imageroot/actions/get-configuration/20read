@@ -24,10 +24,15 @@ config["lets_encrypt"] = os.getenv("TRAEFIK_LETS_ENCRYPT") == "True"
 
 # Dump the configuration to stdout
 # json.dump(config, fp=sys.stdout)
-if os.path.exists("qbittorrent.env"): 
-	data = agent.read_envfile("qbittorrent.env") 
-	config["WEBUI_PORT"] = data.get("WEBUI_PORT") 
-else: 
-	config["WEBUI_PORT"] = "" 
- 
+#if os.path.exists("qbittorrent.env"): 
+#	data = agent.read_envfile("qbittorrent.env") 
+#	config["WEBUI_PORT"] = data.get("WEBUI_PORT") 
+#else: 
+#	config["WEBUI_PORT"] = ""  
+
+if os.path.exists("volume-qbittorrent.env"): 
+    data = agent.read_envfile("volume-qbittorrent.env")
+    config["DOWNLOADS_DIR"] = data.get("DOWNLOADS_DIR")
+
+
 json.dump(config, fp=sys.stdout)
