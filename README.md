@@ -1,44 +1,17 @@
 # ns8-qbittorrent
 
-This is a template module for [NethServer 8](https://github.com/NethServer/ns8-core).
-To start a new module from it:
-
-1. Click on [Use this template](https://github.com/NethServer/ns8-ns8-qbittorrent/generate).
-   Name your repo with `ns8-` prefix (e.g. `ns8-mymodule`). 
-   Do not end your module name with a number, like ~~`ns8-baaad2`~~!
-
-1. Clone the repository, enter the cloned directory and
-   [configure your GIT identity](https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup#_your_identity)
-
-1. Rename some references inside the repo:
-   ```
-   modulename=$(basename $(pwd) | sed 's/^ns8-//') &&
-   git mv imageroot/systemd/user/ns8-qbittorrent.service imageroot/systemd/user/${modulename}.service &&
-   git mv imageroot/systemd/user/ns8-qbittorrent-app.service imageroot/systemd/user/${modulename}-app.service && 
-   git mv tests/ns8-qbittorrent.robot tests/${modulename}.robot &&
-   sed -i "s/ns8-qbittorrent/${modulename}/g" $(find .github/ * -type f) &&
-   git commit -a -m "Repository initialization"
-   ```
-
-1. Edit this `README.md` file, by replacing this section with your module
-   description
-
-1. Adjust `.github/workflows` to your needs. `clean-registry.yml` might
-   need the proper list of image names to work correctly. Unused workflows
-   can be disabled from the GitHub Actions interface.
-
-1. Commit and push your local changes
+This is a module for [NethServer 8](https://github.com/NethServer/ns8-core).
 
 ## Install
 
 Instantiate the module with:
 
-    add-module ghcr.io/nethserver/ns8-qbittorrent:latest 1
+    add-module ghcr.io/shran21/ns8-qbittorrent:latest 1
 
 The output of the command will return the instance name.
 Output example:
 
-    {"module_id": "ns8-qbittorrent1", "image_name": "ns8-qbittorrent", "image_url": "ghcr.io/nethserver/ns8-qbittorrent:latest"}
+    {"module_id": "ns8-qbittorrent1", "image_name": "ns8-qbittorrent", "image_url": "ghcr.io/shran21/ns8-qbittorrent:latest"}
 
 ## Configure
 
@@ -48,6 +21,7 @@ Launch `configure-module`, by setting the following parameters:
 - `host`: a fully qualified domain name for the application
 - `http2https`: enable or disable HTTP to HTTPS redirection (true/false)
 - `lets_encrypt`: enable or disable Let's Encrypt certificate (true/false)
+- `Downloads Directory`: the absolute path to the download directory used by the application.
 
 
 Example:
@@ -58,6 +32,7 @@ api-cli run configure-module --agent module/ns8-qbittorrent1 --data - <<EOF
   "host": "ns8-qbittorrent.domain.com",
   "http2https": true,
   "lets_encrypt": false
+  "downloads_dir": "/data/qbittorrent/downloads"
 }
 EOF
 ```
@@ -65,6 +40,73 @@ EOF
 The above command will:
 - start and configure the ns8-qbittorrent instance
 - configure a virtual host for trafik to access the instance
+
+### Setting Up the Downloads Directory
+
+The `downloads_dir` specifies the directory where the application stores downloaded files. By default, the directory must exist, and the rootless container's user must have the necessary permissions to access it.
+
+---
+
+### Steps to Set Up the Downloads Directory
+
+1. **Create the Default Directory:**
+   If the directory does not already exist, create it using the `mkdir` command. For example:
+   ```bash
+   mkdir -p /data/qbittorrent/downloads
+   ```
+
+2. **Set the Correct Permissions:**
+   Assign ownership of the directory to the rootless container user. Replace `<username>` with the user running the container (e.g., `ns8-qbittorrent`):
+   ```bash
+   chown -R <username>:<username> /data/qbittorrent/downloads
+   ```
+
+3. **Verify Permissions:**
+   Ensure that the directory has the correct permissions:
+   ```bash
+   ls -ld /data/qbittorrent/downloads
+   ```
+
+   Example output:
+   ```
+   drwxr-xr-x 2 ns8-qbittorrent ns8-qbittorrent 4096 Jan 23 20:00 /data/qbittorrent/downloads
+   ```
+
+4. **Specify the Directory in the Configuration:**
+   Pass the `downloads_dir` path when configuring the module:
+   ```bash
+   api-cli run configure-module --agent module/ns8-qbittorrent1 --data - <<EOF
+   {
+     "host": "ns8-qbittorrent.domain.com",
+     "http2https": true,
+     "lets_encrypt": false,
+     "downloads_dir": "/data/qbittorrent/downloads"
+   }
+   EOF
+   ```
+
+---
+
+### Example: Granting Permissions to Rootless Container User
+
+If the rootless container user is `ns8-qbittorrent14`, you can grant the necessary permissions as follows:
+
+```bash
+mkdir -p /data/qbittorrent/downloads
+chown -R ns8-qbittorrent14:ns8-qbittorrent14 /data/qbittorrent/downloads
+```
+
+Verify the permissions:
+```bash
+ls -ld /data/qbittorrent/downloads
+```
+
+Example output:
+```
+drwxr-xr-x 2 ns8-qbittorrent14 ns8-qbittorrent14 4096 Jan 23 20:00 /data/qbittorrent/downloads
+```
+
+---
 
 ## Get the configuration
 You can retrieve the configuration with
@@ -160,12 +202,3 @@ Test the module using the `test-module.sh` script:
     ./test-module.sh <NODE_ADDR> ghcr.io/nethserver/ns8-qbittorrent:latest
 
 The tests are made using [Robot Framework](https://robotframework.org/)
-
-## UI translation
-
-Translated with [Weblate](https://hosted.weblate.org/projects/ns8/).
-
-To setup the translation process:
-
-- add [GitHub Weblate app](https://docs.weblate.org/en/latest/admin/continuous.html#github-setup) to your repository
-- add your repository to [hosted.weblate.org]((https://hosted.weblate.org) or ask a NethServer developer to add it to ns8 Weblate project
