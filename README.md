@@ -107,6 +107,21 @@ drwxr-xr-x 2 ns8-qbittorrent14 ns8-qbittorrent14 4096 Jan 23 20:00 /data/qbittor
 ```
 
 ---
+### Setting the qBittorrent Admin Password
+
+Upon the first launch, the default admin password for qBittorrent is generated automatically. You can find this password in the **NS8 admin interface system logs**.
+
+#### **Important Note:**
+- If the default password is not changed, a new password will be generated every time the container restarts.
+
+#### **Steps to Change the Password:**
+1. Log in to the qBittorrent web interface using the default admin password from the system logs.
+2. Navigate to the **Options** section.
+3. Under the **Web UI** tab, change the admin password to your desired value.
+4. Save the changes.
+
+After setting a new password, it will persist across container restarts.
+
 
 ## Get the configuration
 You can retrieve the configuration with
