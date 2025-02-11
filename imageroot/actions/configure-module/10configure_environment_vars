@@ -37,6 +37,12 @@ CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
 # Ensure the downloads directory exists
 #os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
+#Set ACLs
+def set_acl(path, user):
+    os.system(f"setfacl -m u:{user}:rwx {path}")
+set_acl(DOWNLOADS_DIR, current_user)
+
+
 # Set ownership and permissions (optional, depending on system requirements)
 #os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
 #os.chmod(CONFIG_DIR, 0o775)  # Example permission
