@@ -46,16 +46,16 @@ def get_current_user():
 # Load or set the default directory
 current_user = get_current_user()
 DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
-#DEFAULT_DOWNLOADS_DIR = "/data/qbittorrent/downloads"
+DEFAULT_DOWNLOADS_DIR = f"/home/{current_user}/.config/state/download"
 
 CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
-#DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
+DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
 
 # Ensure the configuration directory exists
 os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # Ensure the downloads directory exists
-#os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 
 # Optionally, set ownership and permissions for the directory
 #os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
@@ -65,12 +65,12 @@ os.makedirs(CONFIG_DIR, exist_ok=True)
 # os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
 
 # qBittorrent environment configuration
-#qbittorrent_config = {
-#    "DOWNLOADS_DIR": DOWNLOADS_DIR,
-#    "CONFIG_DIR": CONFIG_DIR
-#}
+qbittorrent_config = {
+    "DOWNLOADS_DIR": DOWNLOADS_DIR,
+    "CONFIG_DIR": CONFIG_DIR
+}
 
-#agent.write_envfile("volume-qbittorrent.env", qbittorrent_config)
+agent.write_envfile("volume-qbittorrent.env", qbittorrent_config)
 
 # just before starting systemd unit
 # agent.dump_env()
