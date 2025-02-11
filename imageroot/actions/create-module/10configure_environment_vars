@@ -40,19 +40,19 @@ agent.write_envfile("database.env", mariadb_config)
 
 
 # Get the current rootless container user dynamically
-#def get_current_user():
-#    return pwd.getpwuid(os.getuid()).pw_name
+def get_current_user():
+   return pwd.getpwuid(os.getuid()).pw_name
 
 # Load or set the default directory
-#current_user = get_current_user()
-#DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
+current_user = get_current_user()
+DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
 #DEFAULT_DOWNLOADS_DIR = "/data/qbittorrent/downloads"
 
-#CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
+CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
 #DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
 
 # Ensure the configuration directory exists
-#os.makedirs(CONFIG_DIR, exist_ok=True)
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 # Ensure the downloads directory exists
 #os.makedirs(DOWNLOADS_DIR, exist_ok=True)
