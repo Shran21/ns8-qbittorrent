@@ -46,10 +46,10 @@ def get_current_user():
 # Load or set the default directory
 current_user = get_current_user()
 DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
-#DEFAULT_DOWNLOADS_DIR = "/data/qbittorrent/downloads"
+DEFAULT_DOWNLOADS_DIR = f"/home/{current_user}/.config/state/downloads"
 
 CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
-#DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
+DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
 
 # Ensure the configuration directory exists
 os.makedirs(CONFIG_DIR, exist_ok=True)
