@@ -65,12 +65,12 @@ os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 # os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
 
 # qBittorrent environment configuration
-#qbittorrent_config = {
-#    "DOWNLOADS_DIR": DOWNLOADS_DIR,
-#    "CONFIG_DIR": CONFIG_DIR
-#}
+qbittorrent_config = {
+    "DOWNLOADS_DIR": DOWNLOADS_DIR,
+    "CONFIG_DIR": CONFIG_DIR
+}
 
-#agent.write_envfile("volume-qbittorrent.env", qbittorrent_config)
+agent.write_envfile("volume-qbittorrent.env", qbittorrent_config)
 
 # just before starting systemd unit
 # agent.dump_env()
