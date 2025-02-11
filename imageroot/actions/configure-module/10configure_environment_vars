@@ -20,8 +20,8 @@ def get_current_user():
     return pwd.getpwuid(os.getuid()).pw_name
 
 # Load the default directory or use a fallback
-DEFAULT_DOWNLOADS_DIR = f"/home/{current_user}/.config/state/downloads"
 current_user = get_current_user()
+DEFAULT_DOWNLOADS_DIR = f"/home/{current_user}/.config/state/downloads"
 DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
 
 
