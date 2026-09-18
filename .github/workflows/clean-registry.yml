@@ -15,5 +15,7 @@ jobs:
     steps:
       - uses: NethServer/ns8-github-actions/.github/actions/delete-image@v1
         with:
-          images: "qbittorrent-test"
+          # Must match the image name built by build-images.sh, otherwise
+          # deleting a branch leaves its image tag behind in ghcr.io.
+          images: "ns8-qbittorrent"
           delete_image_token: ${{ secrets.IMAGES_CLEANUP_TOKEN }}
