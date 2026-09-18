@@ -3,6 +3,13 @@ name: "Clean up API JSON Schema docs"
 on:
   delete:
 
+# The reusable workflow requests `contents: write` to push the generated
+# apidoc branch. A called workflow can only narrow the permissions the
+# caller hands it, never widen them, so without this block the run fails
+# at startup with no jobs whenever the repository default is read-only.
+permissions:
+  contents: write
+
 jobs:
   build-apidoc:
     name: "Delete apidoc branch ${{ github.event.ref }}"
