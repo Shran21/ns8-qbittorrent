@@ -151,15 +151,45 @@ command line:
 
     api-cli run get-configuration --agent module/ns8-qbittorrent1
 
+## Image tags and releases
+
+The CI publishes one image tag per git ref, so the tag is simply the name
+of the branch or git tag that triggered the build:
+
+| What you push | Image tags produced |
+|---|---|
+| a feature branch | `ghcr.io/shran21/ns8-qbittorrent:<branch-name>` (slashes become dashes) |
+| a commit on `main` | `:main` **and** `:latest` |
+| a git tag `2.0.0` | `:2.0.0` |
+
+Note that a release tag does **not** move `:latest`: only `main` does. A
+version is therefore published in two steps -- merge to `main`, then tag.
+
+To cut a release:
+
+1. Merge the change into `main`. This publishes `:main` and `:latest`.
+2. Create a GitHub release whose tag is a plain [semantic
+   version](https://handbook.nethserver.org/version_numbering/) such as
+   `2.0.0`, or `2.0.1-testing.1` for a pre-release. Do not prefix it with
+   `v`: NS8 compares these strings as versions, and `org.nethserver.min-from`
+   and the repository metadata both expect bare semver. Build metadata
+   (`+`) is not allowed either, because `+` is invalid in a container tag.
+3. Delete the merged branch to drop its image tag from ghcr.io
+   (`clean-registry.yml` does this on the `delete` event).
+
+Creating the release from the GitHub web interface triggers the build. A
+release created by a workflow using the default `GITHUB_TOKEN` does **not**
+trigger downstream workflows, so the image would not be published.
+
 ## Update
 
 Update an installed instance to a newer image:
 
-    update-module ghcr.io/shran21/ns8-qbittorrent:1.0.0 ns8-qbittorrent1
+    update-module ghcr.io/shran21/ns8-qbittorrent:2.0.0 ns8-qbittorrent1
 
 or through the API:
 
-    api-cli run update-module --data '{"module_url":"ghcr.io/shran21/ns8-qbittorrent:1.0.0","instances":["ns8-qbittorrent1"],"force":true}'
+    api-cli run update-module --data '{"module_url":"ghcr.io/shran21/ns8-qbittorrent:2.0.0","instances":["ns8-qbittorrent1"],"force":true}'
 
 Instances created before the volume rework are migrated automatically by
 `update-module.d/10migrate_volumes`: the configuration is copied from the old
