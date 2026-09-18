@@ -19,6 +19,9 @@ reponame="ns8-qbittorrent"
 # makes the module unreproducible and lets an upstream change break a
 # running installation without any action from the administrator.
 # Renovate keeps this line up to date.
+#
+# NOTE: .github/workflows/publish-images.yml parses the next line to build
+# the image list for the Trivy scan. Keep the `name="value"` shape.
 qbittorrent_image="docker.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls476"
 
 # Create a new empty container image

@@ -17,10 +17,43 @@ jobs:
   module:
     needs: publish-images
     uses: NethServer/ns8-github-actions/.github/workflows/module-info.yml@v1
-  trivy:
-    needs: module
 
+  # module-info.yml derives the image name by stripping the "ns8-" prefix
+  # from the repository name, which is the NS8 convention. This module
+  # publishes "ns8-qbittorrent" instead, so that output points at an image
+  # that does not exist and comes back empty. An empty string then breaks
+  # fromJson() in the Trivy matrix: the scan_images job is never created,
+  # and the run is marked failed without any failed job to point at.
+  # Build the list here instead, from the one place the images are defined.
+  images:
+    name: "List module images"
+    needs: module
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: list
+        env:
+          OWNER: ${{ needs.module.outputs.owner }}
+          TAG: ${{ needs.module.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # build-images.sh is the single source of truth for the pinned
+          # service image; fail loudly rather than emit an unusable list.
+          service_image=$(sed -n 's/^qbittorrent_image="\(.*\)"$/\1/p' build-images.sh)
+          if [ -z "${service_image}" ]; then
+            echo "::error file=build-images.sh::cannot read qbittorrent_image"
+            exit 1
+          fi
+          module_image="ghcr.io/${OWNER}/ns8-qbittorrent:${TAG}"
+          list=$(jq -nc --arg m "${module_image}" --arg s "${service_image}" '[$m, $s]')
+          echo "list=${list}" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Images to scan::${list}"
+
+  trivy:
+    needs: [module, images]
     if: ${{ needs.module.outputs.release == 'stable' || needs.module.outputs.release == 'latest' || github.event_name == 'workflow_dispatch' }}
     uses: NethServer/ns8-github-actions/.github/workflows/scan-with-trivy.yml@v1
     with:
-      images: ${{ needs.module.outputs.images }}
+      images: ${{ needs.images.outputs.list }}
