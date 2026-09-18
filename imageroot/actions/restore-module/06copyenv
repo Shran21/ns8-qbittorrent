@@ -5,19 +5,33 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+#
+# Carry the settings of the backed up instance over to this one, so that
+# the restored module keeps its virtual host, its downloads directory and
+# its BitTorrent port.
+#
+
 import sys
 import json
-import agent
+
+import qbittorrent
 
 request = json.load(sys.stdin)
-
 original_environment = request['environment']
 
-for evar in [
-        "TRAEFIK_HOST",
-        "TRAEFIK_HTTP2HTTPS",
-        "TRAEFIK_LETS_ENCRYPT",
-    ]:
-    agent.set_env(evar, original_environment[evar])
+restored = {}
+for evar, fallback in [
+    ("TRAEFIK_HOST", ""),
+    ("TRAEFIK_HTTP2HTTPS", "True"),
+    ("TRAEFIK_LETS_ENCRYPT", "False"),
+    ("DOWNLOADS_MOUNT", qbittorrent.build_downloads_mount("")),
+    ("BT_PORT", str(qbittorrent.DEFAULT_BT_PORT)),
+    ("BT_PORT_ENABLED", "1"),
+    ("UMASK", qbittorrent.DEFAULT_UMASK),
+    ("TZ", qbittorrent.DEFAULT_TZ),
+]:
+    # A backup taken before a given setting existed simply has no such
+    # variable: fall back to the default instead of failing the restore.
+    restored[evar] = original_environment.get(evar, fallback)
 
-agent.dump_env()
+qbittorrent.set_many(restored)

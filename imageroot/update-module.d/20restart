@@ -5,11 +5,17 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-# If the control reaches this step, the service can be enabled and started
+# If the control reaches this step, the service can be started again.
 
 set -e
 
 # Redirect any output to the journal (stderr)
 exec 1>&2
 
-systemctl --user try-restart ns8-qbittorrent.service
+# "restart" rather than "try-restart": 10migrate_volumes stops the service
+# to move data between volumes, and try-restart would leave it stopped.
+# The unit is enabled by configure-module, so an instance that was never
+# configured is correctly left alone.
+if systemctl --user -q is-enabled ns8-qbittorrent.service; then
+    systemctl --user restart ns8-qbittorrent.service
+fi

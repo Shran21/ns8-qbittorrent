@@ -2,13 +2,17 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Configure ns8-qbittorrent",
     "$id": "http://nethserver.org/json-schema/task/input/ns8-qbittorrent/configure-module",
-    "description": "Configure ns8-qbittorrent",
+    "description": "Configure the qBittorrent instance",
     "examples": [
         {
-            "host": "ns8-qbittorrent.domain.org",
+            "host": "qbittorrent.domain.org",
             "http2https": true,
             "lets_encrypt": true,
-            "downloads_dir": "/custom/downloads/path"
+            "downloads_dir": "",
+            "bt_port": 6881,
+            "bt_port_enabled": true,
+            "umask": "002",
+            "timezone": "Europe/Budapest"
         }
     ],
     "type": "object",
@@ -20,7 +24,8 @@
     "properties": {
         "host": {
             "type": "string",
-            "description": "Host name for the application, like 'ns8-qbittorrent.domain.org'",
+            "title": "Host name",
+            "description": "Host name for the WebUI, like 'qbittorrent.domain.org'",
             "format": "hostname",
             "pattern": "\\."
         },
@@ -36,10 +41,38 @@
         },
         "downloads_dir": {
             "type": "string",
-            "title": "Downloads Directory",
-            "description": "Custom path for qBittorrent downloads directory. If not specified, the default is '/data/qbittorrent/downloads'.",
-            "pattern": "^/.*",
-            "default": "/data/qbittorrent/downloads"
+            "title": "Downloads directory",
+            "description": "Absolute path of an existing host directory to bind-mount as the downloads directory. Leave empty to use the qbittorrent-downloads named volume, which can be moved to an additional disk from the cluster UI. The directory must be writable by the module user.",
+            "pattern": "^(/[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*)?$",
+            "default": ""
+        },
+        "bt_port": {
+            "type": "integer",
+            "title": "BitTorrent listen port",
+            "description": "TCP/UDP port used for incoming peer connections. Forward this port on the upstream router to get incoming connections.",
+            "minimum": 1024,
+            "maximum": 65535,
+            "default": 6881
+        },
+        "bt_port_enabled": {
+            "type": "boolean",
+            "title": "Open the BitTorrent port in the firewall",
+            "description": "Allow incoming peer connections from the public firewall zone. Disable it when the port is published some other way, for instance through a VPN.",
+            "default": true
+        },
+        "umask": {
+            "type": "string",
+            "title": "File creation mask",
+            "description": "Umask applied to downloaded files, as an octal value like '002'.",
+            "pattern": "^[0-7]{3,4}$",
+            "default": "002"
+        },
+        "timezone": {
+            "type": "string",
+            "title": "Time zone",
+            "description": "IANA time zone used inside the container, like 'Europe/Budapest'.",
+            "pattern": "^[A-Za-z0-9._+-]+(/[A-Za-z0-9._+-]+)*$",
+            "default": "UTC"
         }
     }
 }

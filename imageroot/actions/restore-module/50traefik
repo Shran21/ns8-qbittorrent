@@ -5,17 +5,39 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
-import sys
+#
+# Re-apply the original configuration on the restored instance.
+#
+
 import json
-import agent
 import os
+import sys
+
+import agent
+import agent.tasks
+import qbittorrent
 
 request = json.load(sys.stdin)
-renv = request['environment']
+settings = qbittorrent.read_settings(request['environment'])
 
-configure_retval = agent.tasks.run(agent_id=os.environ['AGENT_ID'], action='configure-module', data={
-    "lets_encrypt": renv["TRAEFIK_LETS_ENCRYPT"] == "True",
-    "host": renv["TRAEFIK_HOST"],
-    "http2https": renv["TRAEFIK_HTTP2HTTPS"] == "True",
-})
+# The downloads directory is a host path that belongs to the node, not to
+# the backup: the destination node may not have it. Rather than aborting
+# the whole restore, fall back to the named volume and say so loudly --
+# downloaded data is never part of the backup anyway, so nothing is lost
+# and the administrator can point the module back at the right path.
+downloads_error = qbittorrent.validate_downloads_dir(settings['downloads_dir'])
+if downloads_error:
+    print(
+        f"WARNING: the original downloads directory {settings['downloads_dir']!r} is not usable "
+        f"on this node ({downloads_error}). Falling back to the {qbittorrent.DOWNLOADS_VOLUME} "
+        "volume. Set the directory again from the Settings page once it is available.",
+        file=sys.stderr,
+    )
+    settings['downloads_dir'] = ""
+
+configure_retval = agent.tasks.run(
+    agent_id=os.environ['AGENT_ID'],
+    action='configure-module',
+    data=settings,
+)
 agent.assert_exp(configure_retval['exit_code'] == 0, "The configure-module subtask failed!")

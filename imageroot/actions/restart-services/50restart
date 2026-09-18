@@ -1,0 +1,31 @@
+#!/bin/bash
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Restart the qBittorrent pod and its container.
+#
+# This is the action behind the "Restart service" button of the Status
+# page. Restarting the pod unit is enough: qbittorrent-app.service is
+# bound to it and follows along.
+#
+
+set -e
+
+# Redirect any output to the journal (stderr)
+exec 1>&2
+
+if ! systemctl --user -q is-enabled ns8-qbittorrent.service; then
+    echo "ns8-qbittorrent.service is not enabled: configure the module first." >&2
+    exit 1
+fi
+
+systemctl --user restart ns8-qbittorrent.service
+
+# Report the outcome: a unit that fails right after a restart would
+# otherwise leave the task green while the service is down.
+systemctl --user --no-pager --lines=0 status ns8-qbittorrent.service qbittorrent-app.service || true
+systemctl --user -q is-active ns8-qbittorrent.service qbittorrent-app.service

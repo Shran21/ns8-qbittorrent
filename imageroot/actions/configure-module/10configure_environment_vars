@@ -5,60 +5,23 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+#
+# Store the module settings. The input has already been validated by
+# 01validate_input, so every value written here is safe to expand in a
+# Systemd unit and to pass to `podman run`.
+#
+
 import json
 import sys
-import agent
-import os
-import pwd
 
-# Try to parse the stdin as JSON.
-# If parsing fails, output everything to stderr
+import qbittorrent
+
 data = json.load(sys.stdin)
 
-# Get the current rootless container user dynamically
-def get_current_user():
-    return pwd.getpwuid(os.getuid()).pw_name
-
-# Load the default directory or use a fallback
-current_user = get_current_user()
-DEFAULT_DOWNLOADS_DIR = "/home/{current_user}/.config/state/downloads"
-DEFAULT_CONFIG_DIR = f"/home/{current_user}/.config/state/config"
-
-
-# Retrieve variables from input JSON
-WEBUI_PORT = data.get("webui_port")
-DOWNLOADS_DIR = data.get("downloads_dir", DEFAULT_DOWNLOADS_DIR)
-CONFIG_DIR = data.get("config_dir", DEFAULT_CONFIG_DIR)
-
-
-# Ensure the configuration directory exists
-#os.makedirs(CONFIG_DIR, exist_ok=True)
-
-# Ensure the downloads directory exists
-#os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-
-#Set ACLs
-def set_acl(path, user):
-    os.system(f"setfacl -m u:{user}:rwx {path}")
-set_acl(DOWNLOADS_DIR, current_user)
-
-
-# Set ownership and permissions (optional, depending on system requirements)
-#os.chown(CONFIG_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
-#os.chmod(CONFIG_DIR, 0o775)  # Example permission
-# os.chown(DOWNLOADS_DIR, os.getuid(), os.getgid())  # Adjust user/group if needed
-# os.chmod(DOWNLOADS_DIR, 0o755)  # Example permission
-
-# Create environment variables dictionary
-qbittorrent = {
-    "WEBUI_PORT": WEBUI_PORT,
-    "DOWNLOADS_DIR": DOWNLOADS_DIR,
-    "CONFIG_DIR": CONFIG_DIR
-}
-
-# Write the environment variables to the file
-agent.write_envfile("volume-qbittorrent.env", qbittorrent)
-
-#DEBUG
-#print("Received data:", data, file=sys.stderr)
-#print("Writing the following environment variables:", qbittorrent, file=sys.stderr)
+qbittorrent.set_many({
+    "DOWNLOADS_MOUNT": qbittorrent.build_downloads_mount(data.get("downloads_dir", "")),
+    "BT_PORT": str(data.get("bt_port", qbittorrent.DEFAULT_BT_PORT)),
+    "BT_PORT_ENABLED": "1" if data.get("bt_port_enabled", True) else "",
+    "UMASK": data.get("umask", qbittorrent.DEFAULT_UMASK),
+    "TZ": data.get("timezone", qbittorrent.DEFAULT_TZ),
+})

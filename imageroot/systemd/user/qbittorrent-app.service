@@ -3,27 +3,51 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 
+#
+# This systemd unit runs the qBittorrent container inside the pod created
+# by ns8-qbittorrent.service.
+#
+# PUID/PGID are set to 0 on purpose. This is a rootless container: UID 0
+# inside the container is mapped to the unprivileged module user on the
+# host. Running the application as container-root therefore means running
+# it as the module user, which is exactly the identity that owns the
+# config volume and that must be able to write the downloads directory.
+# Any other PUID would be mapped to a subordinate UID with no access to
+# the bind-mounted downloads directory.
+#
+
 [Unit]
-Description=Podman  qbittorrent-app.service
+Description=Podman qbittorrent-app.service
 BindsTo=ns8-qbittorrent.service
 After=ns8-qbittorrent.service
 
 [Service]
 Environment=PODMAN_SYSTEMD_UNIT=%n
-EnvironmentFile=%S/state/environment
-EnvironmentFile=-%S/state/smarthost.env
-EnvironmentFile=-%S/state/volume-qbittorrent.env
-WorkingDirectory=%S/state
+EnvironmentFile=%E/state/environment
+WorkingDirectory=%E/state
 Restart=always
 TimeoutStopSec=70
-ExecStartPre=/bin/mkdir -p tmp
 ExecStartPre=/bin/rm -f %t/qbittorrent-app.pid %t/qbittorrent-app.ctr-id
-ExecStartPre=-runagent discover-smarthost
-ExecStart=/usr/bin/podman run --conmon-pidfile %t/qbittorrent-app.pid  --cidfile %t/qbittorrent-app.ctr-id --cgroups=no-conmon  --pod-id-file %t/ns8-qbittorrent.pod-id --replace -d --name  qbittorrent-app  --volume ${CONFIG_DIR}:/config:Z --volume ${DOWNLOADS_DIR}:/downloads:Z  ${QBITTORRENT_IMAGE}  
+ExecStartPre=/usr/local/bin/runagent bootstrap-qbittorrent-config
+ExecStart=/usr/bin/podman run \
+    --detach \
+    --conmon-pidfile=%t/qbittorrent-app.pid \
+    --cidfile=%t/qbittorrent-app.ctr-id \
+    --cgroups=no-conmon \
+    --pod-id-file=%t/ns8-qbittorrent.pod-id \
+    --replace --name=qbittorrent-app \
+    --env=PUID=0 \
+    --env=PGID=0 \
+    --env=UMASK=${UMASK} \
+    --env=TZ=${TZ} \
+    --env=WEBUI_PORT=8080 \
+    --env=TORRENTING_PORT=${BT_PORT} \
+    --volume=qbittorrent-config:/config \
+    --volume=${DOWNLOADS_MOUNT} \
+    ${QBITTORRENT_IMAGE}
 ExecStop=/usr/bin/podman stop --ignore --cidfile %t/qbittorrent-app.ctr-id -t 10
-ExecReload=/usr/bin/podman kill -s HUP qbittorrent-app
-SyslogIdentifier=%u
 ExecStopPost=/usr/bin/podman rm --ignore -f --cidfile %t/qbittorrent-app.ctr-id
+SyslogIdentifier=%u
 PIDFile=%t/qbittorrent-app.pid
 Type=forking
 

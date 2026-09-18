@@ -15,13 +15,19 @@ repobase="${REPOBASE:-ghcr.io/shran21}"
 # Configure the image name
 reponame="ns8-qbittorrent"
 
+# The qBittorrent image is pinned to an exact upstream build: ":latest"
+# makes the module unreproducible and lets an upstream change break a
+# running installation without any action from the administrator.
+# Renovate keeps this line up to date.
+qbittorrent_image="docker.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls476"
+
 # Create a new empty container image
 container=$(buildah from scratch)
 
 # Reuse existing nodebuilder-ns8-qbittorrent container, to speed up builds
 if ! buildah containers --format "{{.ContainerName}}" | grep -q nodebuilder-ns8-qbittorrent; then
     echo "Pulling NodeJS runtime..."
-    buildah from --name nodebuilder-ns8-qbittorrent -v "${PWD}:/usr/src:Z" docker.io/library/node:lts
+    buildah from --name nodebuilder-ns8-qbittorrent -v "${PWD}:/usr/src:Z" docker.io/library/node:24.21.0-slim
 fi
 
 echo "Build static UI files with node..."
@@ -29,23 +35,27 @@ buildah run \
     --workingdir=/usr/src/ui \
     --env="NODE_OPTIONS=--openssl-legacy-provider" \
     nodebuilder-ns8-qbittorrent \
-    sh -c "yarn install && yarn build"
+    sh -c "corepack enable && yarn install --immutable && yarn build"
 
 # Add imageroot directory to the container image
 buildah add "${container}" imageroot /imageroot
 buildah add "${container}" ui/dist /ui
 # Setup the entrypoint, ask to reserve one TCP port with the label and set a rootless container
-# Select you image(s) with the label org.nethserver.images
-# ghcr.io/xxxxx is the GitHub container registry or your own registry or docker.io for Docker Hub
-# The image tag is set to latest by default, but can be overridden with the IMAGETAG environment variable
-# --label="org.nethserver.images=docker.io/mariadb:10.11.5 docker.io/roundcube/roundcubemail:1.6.4-apache"
-# rootfull=0 === rootless container
-# tcp-ports-demand=1 number of tcp Port to reserve , 1 is the minimum, can be udp or tcp
+#
+# Labels:
+# - authorizations: routeadm publishes the WebUI through Traefik, fwadm
+#   opens the BitTorrent listen port in the public firewall zone.
+# - tcp-ports-demand=1: the WebUI backend port, bound to the loopback
+#   address. The BitTorrent port is chosen by the administrator (it has to
+#   be forwarded on the upstream router), so it is not allocated here.
+# - volumes: qbittorrent-downloads is offered for assignment to an
+#   additional disk, because downloaded data is the part that grows.
 buildah config --entrypoint=/ \
-    --label="org.nethserver.authorizations=traefik@node:routeadm" \
+    --label="org.nethserver.authorizations=traefik@node:routeadm node:fwadm" \
     --label="org.nethserver.tcp-ports-demand=1" \
     --label="org.nethserver.rootfull=0" \
-    --label="org.nethserver.images=docker.io/linuxserver/qbittorrent:latest" \
+    --label="org.nethserver.volumes=qbittorrent-downloads" \
+    --label="org.nethserver.images=${qbittorrent_image}" \
     "${container}"
 # Commit the image
 buildah commit "${container}" "${repobase}/${reponame}"

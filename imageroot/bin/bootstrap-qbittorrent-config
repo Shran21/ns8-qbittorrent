@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Prepare the qBittorrent configuration volume before the container starts.
+#
+# On the very first start the qBittorrent.conf file is seeded with settings
+# that let the WebUI work behind the Traefik reverse proxy. Afterwards the
+# file belongs to the administrator and is left alone, with one exception:
+# the BitTorrent listen port is owned by the platform (it is published by
+# the Systemd unit and opened in the firewall), so it is kept in sync on
+# every start.
+#
+
+import configparser
+import os
+import subprocess
+import sys
+
+VOLUME_NAME = "qbittorrent-config"
+
+# Values written only when the configuration file does not exist yet.
+#
+# WebUI\LocalHostAuth is deliberately "true": Traefik connects from
+# 127.0.0.1, so bypassing authentication for localhost would leave the
+# WebUI open to anyone able to reach the virtual host.
+#
+# CSRF protection stays enabled. ReverseProxySupportEnabled +
+# TrustedReverseProxiesList are the supported way to run behind a proxy,
+# and ServerDomains accepts the Host header forwarded by Traefik.
+SEED_CONFIG = {
+    "Application": {
+        r"FileLogger\Enabled": "true",
+    },
+    "BitTorrent": {
+        r"Session\DefaultSavePath": "/downloads",
+        r"Session\TempPath": "/downloads/incomplete",
+        r"Session\TempPathEnabled": "true",
+    },
+    "Preferences": {
+        r"WebUI\Address": "*",
+        r"WebUI\Port": "8080",
+        r"WebUI\LocalHostAuth": "true",
+        r"WebUI\CSRFProtection": "true",
+        r"WebUI\ClickjackingProtection": "true",
+        r"WebUI\ServerDomains": "*",
+        r"WebUI\ReverseProxySupportEnabled": "true",
+        r"WebUI\TrustedReverseProxiesList": "127.0.0.1",
+        r"WebUI\AuthSubnetWhitelistEnabled": "false",
+        r"Downloads\SavePath": "/downloads",
+    },
+}
+
+
+def volume_mountpoint(name):
+    """Create the named volume if missing and return its host path."""
+    subprocess.run(
+        ["podman", "volume", "create", "--ignore", name],
+        check=True, stdout=subprocess.DEVNULL,
+    )
+    completed = subprocess.run(
+        ["podman", "volume", "inspect", "--format", "{{.Mountpoint}}", name],
+        check=True, text=True, capture_output=True,
+    )
+    return completed.stdout.strip()
+
+
+def make_parser():
+    parser = configparser.ConfigParser(interpolation=None)
+    # qBittorrent keys are case sensitive: Session\Port and session\port are
+    # different settings, so the default lower-casing must be disabled.
+    parser.optionxform = str
+    return parser
+
+
+def main():
+    try:
+        mountpoint = volume_mountpoint(VOLUME_NAME)
+    except subprocess.CalledProcessError as ex:
+        print(f"Cannot prepare the {VOLUME_NAME} volume: {ex}", file=sys.stderr)
+        return 1
+
+    bt_port = os.environ.get("BT_PORT", "6881")
+    conf_dir = os.path.join(mountpoint, "qBittorrent")
+    conf_file = os.path.join(conf_dir, "qBittorrent.conf")
+
+    parser = make_parser()
+    is_new = not os.path.isfile(conf_file)
+
+    if is_new:
+        parser.read_dict(SEED_CONFIG)
+        print(f"Seeding {conf_file}", file=sys.stderr)
+    else:
+        try:
+            parser.read(conf_file, encoding="utf-8")
+        except configparser.Error as ex:
+            # A configuration file we cannot parse belongs to the
+            # administrator: report it and let the container start with it.
+            print(f"Cannot parse {conf_file}, leaving it untouched: {ex}", file=sys.stderr)
+            return 0
+
+    if not parser.has_section("BitTorrent"):
+        parser.add_section("BitTorrent")
+    if parser.get("BitTorrent", r"Session\Port", fallback=None) != bt_port:
+        parser.set("BitTorrent", r"Session\Port", bt_port)
+        print(f"Set BitTorrent listen port to {bt_port}", file=sys.stderr)
+    elif not is_new:
+        return 0  # nothing to write
+
+    try:
+        os.makedirs(conf_dir, exist_ok=True)
+        # Write through a temporary file so a crash cannot truncate a
+        # working configuration.
+        with open(conf_file + ".tmp", "w", encoding="utf-8") as fp:
+            parser.write(fp, space_around_delimiters=False)
+        os.replace(conf_file + ".tmp", conf_file)
+    except OSError as ex:
+        print(f"Cannot write {conf_file}: {ex}", file=sys.stderr)
+        return 0 if not is_new else 1
+
+    return 0
+
+
+sys.exit(main())

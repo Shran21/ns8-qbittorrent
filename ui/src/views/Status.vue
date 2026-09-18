@@ -39,11 +39,21 @@
         />
       </cv-column>
     </cv-row>
+    <cv-row v-if="error.restartServices">
+      <cv-column>
+        <NsInlineNotification
+          kind="error"
+          :title="$t('action.restart-services')"
+          :description="error.restartServices"
+          :showCloseButton="false"
+        />
+      </cv-column>
+    </cv-row>
     <cv-row>
       <cv-column :md="4" :max="4">
         <NsInfoCard
           light
-          :title="$t('status.ns8-qbittorrent_webapp')"
+          :title="$t('status.qbittorrent_webapp')"
           :description="this.host ? this.host : $t('status.not_configured')"
           :icon="Wikis32"
           :loading="loading.getConfiguration"
@@ -138,8 +148,17 @@
     </cv-row>
     <!-- services -->
     <cv-row>
-      <cv-column class="page-subtitle">
+      <cv-column class="page-subtitle services-heading">
         <h4>{{ $tc("status.services", 2) }}</h4>
+        <NsButton
+          kind="tertiary"
+          size="small"
+          :icon="Restart20"
+          :loading="loading.restartServices"
+          :disabled="loading.getStatus || loading.restartServices"
+          @click="isShownRestartModal = true"
+          >{{ $t("status.restart_service") }}</NsButton
+        >
       </cv-column>
     </cv-row>
     <cv-row v-if="!loading.getStatus">
@@ -282,6 +301,20 @@
         </cv-tile>
       </cv-column>
     </cv-row>
+    <!-- restart confirmation -->
+    <NsModal
+      size="default"
+      :visible="isShownRestartModal"
+      @modal-hidden="isShownRestartModal = false"
+      @primary-click="restartServices"
+    >
+      <template slot="title">{{ $t("status.restart_service") }}</template>
+      <template slot="content">
+        <div>{{ $t("status.restart_service_description") }}</div>
+      </template>
+      <template slot="secondary-button">{{ $t("status.cancel") }}</template>
+      <template slot="primary-button">{{ $t("status.restart") }}</template>
+    </NsModal>
   </cv-grid>
 </template>
 
@@ -325,16 +358,19 @@ export default {
       },
       backupRepositories: [],
       backups: [],
+      isShownRestartModal: false,
       loading: {
         getStatus: false,
         listBackupRepositories: false,
         listBackups: false,
         getConfiguration: false,
+        restartServices: false,
       },
       error: {
         getStatus: "",
         listBackupRepositories: "",
         listBackups: "",
+        restartServices: "",
       },
     };
   },
@@ -386,6 +422,54 @@ export default {
   methods: {
     goToWebapp() {
       window.open(`https://${this.host}`, "_blank");
+    },
+    async restartServices() {
+      this.isShownRestartModal = false;
+      this.loading.restartServices = true;
+      this.error.restartServices = "";
+      const taskAction = "restart-services";
+      const eventId = this.getUuid();
+
+      // register to task error
+      this.core.$root.$once(
+        `${taskAction}-aborted-${eventId}`,
+        this.restartServicesAborted
+      );
+
+      // register to task completion
+      this.core.$root.$once(
+        `${taskAction}-completed-${eventId}`,
+        this.restartServicesCompleted
+      );
+
+      const res = await to(
+        this.createModuleTaskForApp(this.instanceName, {
+          action: taskAction,
+          extra: {
+            title: this.$t("action." + taskAction),
+            description: this.$t("status.restarting"),
+            eventId,
+          },
+        })
+      );
+      const err = res[0];
+
+      if (err) {
+        console.error(`error creating task ${taskAction}`, err);
+        this.error.restartServices = this.getErrorMessage(err);
+        this.loading.restartServices = false;
+        return;
+      }
+    },
+    restartServicesAborted(taskResult, taskContext) {
+      console.error(`${taskContext.action} aborted`, taskResult);
+      this.error.restartServices = this.$t("error.generic_error");
+      this.loading.restartServices = false;
+    },
+    restartServicesCompleted() {
+      this.loading.restartServices = false;
+      // the units have just been restarted: refresh the service cards
+      this.getStatus();
     },
     async getConfiguration() {
       this.loading.getConfiguration = true;
@@ -599,5 +683,16 @@ export default {
 .break-word {
   word-wrap: break-word;
   max-width: 30vw;
+}
+
+.services-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $spacing-05;
+}
+
+.services-heading h4 {
+  margin-bottom: 0;
 }
 </style>

@@ -11,7 +11,5 @@ exec 1>&2
 
 # If the control reaches this step, the service can be enabled and started
 
-touch smarthost.env
-
 systemctl --user enable ns8-qbittorrent.service
 systemctl --user restart ns8-qbittorrent.service

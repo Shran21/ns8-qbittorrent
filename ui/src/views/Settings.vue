@@ -24,8 +24,8 @@
         <cv-tile light>
           <cv-form @submit.prevent="configureModule">
             <cv-text-input
-              :label="$t('settings.ns8-qbittorrent_fqdn')"
-              placeholder="ns8-qbittorrent.example.org"
+              :label="$t('settings.qbittorrent_fqdn')"
+              placeholder="qbittorrent.example.org"
               v-model.trim="host"
               class="mg-bottom"
               :invalid-message="$t(error.host)"
@@ -61,21 +61,79 @@
                 $t("settings.enabled")
               }}</template>
             </cv-toggle>
-              <!-- advanced options -->
+            <!-- BitTorrent connectivity -->
+            <h6 class="section-title">{{ $t("settings.connectivity") }}</h6>
+            <cv-toggle
+              value="btPortEnabled"
+              :label="$t('settings.bt_port_enabled')"
+              v-model="isBtPortEnabled"
+              :disabled="loading.getConfiguration || loading.configureModule"
+              class="mg-bottom"
+            >
+              <template slot="text-left">{{
+                $t("settings.disabled")
+              }}</template>
+              <template slot="text-right">{{
+                $t("settings.enabled")
+              }}</template>
+            </cv-toggle>
+            <cv-number-input
+              :label="$t('settings.bt_port')"
+              :helper-text="$t('settings.bt_port_helper')"
+              v-model="btPort"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.bt_port)"
+              :disabled="loading.getConfiguration || loading.configureModule"
+              :min="1024"
+              :max="65535"
+              :step="1"
+              ref="bt_port"
+            >
+            </cv-number-input>
+            <!-- advanced options -->
             <cv-accordion ref="accordion" class="maxwidth mg-bottom">
-              <cv-accordion-item :open="toggleAccordion[0]">
+              <cv-accordion-item :open="false">
                 <template slot="title">{{ $t("settings.advanced") }}</template>
                 <template slot="content">
-                   <cv-text-input
+                  <cv-text-input
                     :label="$t('settings.downloads_dir')"
+                    :helper-text="$t('settings.downloads_dir_helper')"
                     placeholder="/data/qbittorrent/downloads"
                     v-model.trim="downloadsDir"
                     class="mg-bottom"
                     :invalid-message="$t(error.downloads_dir)"
-                    :disabled="loading.getConfiguration || loading.configureModule"
-                    ref="downloadsDir"
-                   >
-                 </cv-text-input>
+                    :disabled="
+                      loading.getConfiguration || loading.configureModule
+                    "
+                    ref="downloads_dir"
+                  >
+                  </cv-text-input>
+                  <cv-text-input
+                    :label="$t('settings.timezone')"
+                    :helper-text="$t('settings.timezone_helper')"
+                    placeholder="Europe/Budapest"
+                    v-model.trim="timezone"
+                    class="mg-bottom"
+                    :invalid-message="$t(error.timezone)"
+                    :disabled="
+                      loading.getConfiguration || loading.configureModule
+                    "
+                    ref="timezone"
+                  >
+                  </cv-text-input>
+                  <cv-text-input
+                    :label="$t('settings.umask')"
+                    :helper-text="$t('settings.umask_helper')"
+                    placeholder="002"
+                    v-model.trim="umask"
+                    class="mg-bottom"
+                    :invalid-message="$t(error.umask)"
+                    :disabled="
+                      loading.getConfiguration || loading.configureModule
+                    "
+                    ref="umask"
+                  >
+                  </cv-text-input>
                 </template>
               </cv-accordion-item>
             </cv-accordion>
@@ -114,6 +172,8 @@ import {
   PageTitleService,
 } from "@nethserver/ns8-ui-lib";
 
+const DEFAULT_BT_PORT = 6881;
+
 export default {
   name: "Settings",
   mixins: [
@@ -134,6 +194,10 @@ export default {
       urlCheckInterval: null,
       host: "",
       downloadsDir: "",
+      btPort: DEFAULT_BT_PORT,
+      isBtPortEnabled: true,
+      umask: "002",
+      timezone: "UTC",
       isLetsEncryptEnabled: false,
       isHttpToHttpsEnabled: true,
       loading: {
@@ -145,6 +209,10 @@ export default {
         configureModule: "",
         host: "",
         downloads_dir: "",
+        bt_port: "",
+        bt_port_enabled: "",
+        umask: "",
+        timezone: "",
         lets_encrypt: "",
         http2https: "",
       },
@@ -212,7 +280,14 @@ export default {
     getConfigurationCompleted(taskContext, taskResult) {
       const config = taskResult.output;
       this.host = config.host;
-      this.downloadsDir = config.DOWNLOADS_DIR || "/data/qbittorrent/downloads";
+      // An empty downloads_dir means the qbittorrent-downloads named
+      // volume is in use: keep the field empty so that saving the form
+      // does not silently turn it into a bind mount.
+      this.downloadsDir = config.downloads_dir || "";
+      this.btPort = config.bt_port || DEFAULT_BT_PORT;
+      this.isBtPortEnabled = config.bt_port_enabled;
+      this.umask = config.umask;
+      this.timezone = config.timezone;
       this.isLetsEncryptEnabled = config.lets_encrypt;
       this.isHttpToHttpsEnabled = config.http2https;
 
@@ -223,14 +298,42 @@ export default {
       this.clearErrors(this);
 
       let isValidationOk = true;
-      if (!this.host) {
-        this.error.host = "common.required";
+      let focusAlreadySet = false;
 
-        if (isValidationOk) {
-          this.focusElement("host");
+      const setError = (field, message) => {
+        this.error[field] = message;
+        if (!focusAlreadySet) {
+          this.focusElement(field);
+          focusAlreadySet = true;
         }
         isValidationOk = false;
+      };
+
+      if (!this.host) {
+        setError("host", "common.required");
       }
+
+      // cv-number-input emits NaN, not "", when the value is cleared
+      const btPort = Number(this.btPort);
+      if (!Number.isInteger(btPort) || btPort < 1024 || btPort > 65535) {
+        setError("bt_port", "settings.bt_port_invalid");
+      }
+
+      if (
+        this.downloadsDir &&
+        !/^\/[A-Za-z0-9._@+-]+(\/[A-Za-z0-9._@+-]+)*$/.test(this.downloadsDir)
+      ) {
+        setError("downloads_dir", "settings.downloads_dir_invalid");
+      }
+
+      if (!/^[0-7]{3,4}$/.test(this.umask)) {
+        setError("umask", "settings.umask_invalid");
+      }
+
+      if (!this.timezone) {
+        setError("timezone", "common.required");
+      }
+
       return isValidationOk;
     },
     configureModuleValidationFailed(validationErrors) {
@@ -249,8 +352,6 @@ export default {
       }
     },
     async configureModule() {
-      this.error.test_imap = false;
-      this.error.test_smtp = false;
       const isValidationOk = this.validateConfigureModule();
       if (!isValidationOk) {
         return;
@@ -283,6 +384,10 @@ export default {
           data: {
             host: this.host,
             downloads_dir: this.downloadsDir,
+            bt_port: Number(this.btPort),
+            bt_port_enabled: this.isBtPortEnabled,
+            umask: this.umask,
+            timezone: this.timezone,
             lets_encrypt: this.isLetsEncryptEnabled,
             http2https: this.isHttpToHttpsEnabled,
           },
@@ -327,5 +432,9 @@ export default {
 
 .maxwidth {
   max-width: 38rem;
+}
+
+.section-title {
+  margin-bottom: $spacing-05;
 }
 </style>
