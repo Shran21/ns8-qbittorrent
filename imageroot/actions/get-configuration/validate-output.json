@@ -1,36 +1,71 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Get ns8-qbittorrent settings",
-    "$id": "http://nethserver.org/json-schema/task/input/ns8-qbittorrent/get-configuration",
-    "description": "Get ns8-qbittorrent settings",
+    "$id": "http://nethserver.org/json-schema/task/output/ns8-qbittorrent/get-configuration",
+    "description": "Current settings of the qBittorrent instance",
     "examples": [
         {
-            "host": "ns8-qbittorrent.domain.org",
+            "host": "qbittorrent.domain.org",
             "http2https": true,
-            "lets_encrypt": true
+            "lets_encrypt": true,
+            "downloads_dir": "",
+            "bt_port": 6881,
+            "bt_port_enabled": true,
+            "umask": "002",
+            "timezone": "Europe/Budapest"
         }
     ],
     "type": "object",
     "required": [
         "host",
         "http2https",
-        "lets_encrypt"
+        "lets_encrypt",
+        "downloads_dir",
+        "bt_port",
+        "bt_port_enabled",
+        "umask",
+        "timezone"
     ],
     "properties": {
         "host": {
             "type": "string",
-            "description": "Host name for the application, like 'ns8-qbittorrent.domain.org'",
-            "format": "idn-hostname"
+            "title": "Host name",
+            "description": "Host name for the WebUI, like 'qbittorrent.domain.org'. Empty when the module is not configured yet."
         },
         "lets_encrypt": {
             "type": "boolean",
             "title": "Let's Encrypt certificate",
-            "description": "Request a valid Let's Encrypt certificate."
+            "description": "A valid Let's Encrypt certificate is requested."
         },
         "http2https": {
             "type": "boolean",
             "title": "HTTP to HTTPS redirection",
-            "description": "Redirect all the HTTP requests to HTTPS"
+            "description": "All the HTTP requests are redirected to HTTPS"
+        },
+        "downloads_dir": {
+            "type": "string",
+            "title": "Downloads directory",
+            "description": "Custom host path bind-mounted as the downloads directory. Empty when the qbittorrent-downloads named volume is used."
+        },
+        "bt_port": {
+            "type": "integer",
+            "title": "BitTorrent listen port",
+            "description": "TCP/UDP port used for incoming peer connections."
+        },
+        "bt_port_enabled": {
+            "type": "boolean",
+            "title": "Open the BitTorrent port in the firewall",
+            "description": "Incoming peer connections are allowed from the public firewall zone."
+        },
+        "umask": {
+            "type": "string",
+            "title": "File creation mask",
+            "description": "Umask applied to downloaded files."
+        },
+        "timezone": {
+            "type": "string",
+            "title": "Time zone",
+            "description": "IANA time zone used inside the container."
         }
     }
 }

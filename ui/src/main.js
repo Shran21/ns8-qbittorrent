@@ -45,8 +45,15 @@ async function loadI18n() {
   const navigatorLang = navigator.language.substring(0, 2);
   const messages = await loadLanguage(navigatorLang);
   Vue.use(VueI18n);
-  const i18n = new VueI18n();
+  // Fall back to English per key, not per file: the translated catalogs
+  // lag behind the English one, and without this a missing key renders as
+  // the raw key ("settings.bt_port_helper") instead of an English string.
+  const i18n = new VueI18n({ fallbackLocale: "en", silentFallbackWarn: true });
   i18n.setLocaleMessage(navigatorLang, messages.default);
+  if (navigatorLang !== "en") {
+    const fallbackMessages = await loadLanguage("en");
+    i18n.setLocaleMessage("en", fallbackMessages.default);
+  }
   i18n.locale = navigatorLang;
 
   new Vue({

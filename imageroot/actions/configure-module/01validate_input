@@ -1,0 +1,89 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2023 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Validate everything that the JSON schema cannot check on its own: the
+# virtual host must be free, the downloads directory must exist and be
+# writable, and the BitTorrent port must not be taken by another service.
+#
+
+import json
+import os
+import subprocess
+import sys
+
+import agent
+import qbittorrent
+
+agent.set_weight(os.path.basename(__file__), 0)  # Validation step, no task progress at all
+
+data = json.load(sys.stdin)
+errors = []
+
+host = data.get("host")
+# Do not test the host if it did not change: it is already routed to us.
+if host != os.environ.get("TRAEFIK_HOST", "") and agent.http_route_in_use(domain=host):
+    errors.append({
+        "field": "host",
+        "parameter": "host",
+        "value": host,
+        "error": "domain_already_used_in_traefik",
+    })
+
+downloads_dir = data.get("downloads_dir", "")
+downloads_error = qbittorrent.validate_downloads_dir(downloads_dir)
+if downloads_error:
+    errors.append({
+        "field": "downloads_dir",
+        "parameter": "downloads_dir",
+        "value": downloads_dir,
+        "error": downloads_error,
+    })
+
+def service_is_active():
+    return subprocess.run(
+        ["systemctl", "--user", "-q", "is-active", "ns8-qbittorrent.service"],
+        check=False,
+    ).returncode == 0
+
+
+def we_already_hold(bt_port):
+    """True when the port we are about to bind is the one our own running
+    pod is already publishing.
+
+    Matching the stored BT_PORT is not enough on its own: a freshly created
+    instance stores the default port before its service exists, so a port
+    taken by some other service would slip through unchecked.
+    """
+    return (
+        str(bt_port) == os.environ.get("BT_PORT", "")
+        and os.environ.get("BT_PORT_ENABLED", "") == "1"
+        and service_is_active()
+    )
+
+
+bt_port = data.get("bt_port", qbittorrent.DEFAULT_BT_PORT)
+bt_port_enabled = data.get("bt_port_enabled", True)
+bt_port_error = qbittorrent.validate_bt_port(bt_port)
+# A disabled port is never published, so it cannot clash with anything.
+if not bt_port_error and bt_port_enabled and not we_already_hold(bt_port):
+    # qbittorrent.port_in_use() probes TCP and UDP: the pod publishes both
+    # and `podman pod create` fails if either one is taken.
+    if qbittorrent.port_in_use(bt_port):
+        bt_port_error = "bt_port_in_use"
+if bt_port_error:
+    errors.append({
+        "field": "bt_port",
+        "parameter": "bt_port",
+        "value": bt_port,
+        "error": bt_port_error,
+    })
+
+if errors:
+    agent.set_status('validation-failed')
+    json.dump(errors, fp=sys.stdout)
+    sys.exit(2)

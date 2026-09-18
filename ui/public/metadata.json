@@ -1,9 +1,10 @@
 {
-  "name": "ns8-qbittorrent",
+  "name": "qBittorrent",
+  "upstream_name": "qBittorrent",
   "description": {
-    "en": "My ns8-qbittorrent module"
+    "en": "BitTorrent client with a web interface, published behind Traefik"
   },
-  "categories": [],
+  "categories": ["storage", "multimedia"],
   "authors": [
     {
       "name": "Shran",
@@ -11,9 +12,10 @@
     }
   ],
   "docs": {
-    "documentation_url": "https://docs.ns8-qbittorrent.com/",
-    "bug_url": "https://github.com/Shran21/dev",
-    "code_url": "https://github.com/Shran21/ns8-qbittorrent"
+    "documentation_url": "https://github.com/Shran21/ns8-qbittorrent#readme",
+    "bug_url": "https://github.com/Shran21/ns8-qbittorrent/issues",
+    "code_url": "https://github.com/Shran21/ns8-qbittorrent",
+    "relnotes_url": "https://github.com/Shran21/ns8-qbittorrent/releases"
   },
   "source": "ghcr.io/shran21/ns8-qbittorrent"
 }

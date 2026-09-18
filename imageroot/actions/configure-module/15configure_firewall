@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Open (or close) the BitTorrent listen port in the public firewall zone.
+#
+# Incoming peer connections are what makes a BitTorrent client useful, and
+# they cannot be proxied by Traefik, so the port has to be reachable
+# directly. The administrator can turn this off from the Settings page,
+# for instance when the node sits behind a VPN or a NAT gateway that
+# forwards the port some other way.
+#
+
+import json
+import os
+import sys
+
+import agent
+import qbittorrent
+
+data = json.load(sys.stdin)
+
+bt_port = data.get("bt_port", qbittorrent.DEFAULT_BT_PORT)
+service_name = os.environ["MODULE_ID"]
+
+# add_public_service() only ever adds ports to the service, so a port
+# changed from the Settings page would stay open forever. Dropping the
+# service first is the portable way to get replace semantics: the
+# replace_ports keyword is not available on every supported core.
+agent.remove_public_service(service_name)
+
+if data.get("bt_port_enabled", True):
+    agent.assert_exp(
+        agent.add_public_service(service_name, [f"{bt_port}/tcp", f"{bt_port}/udp"]),
+        "Cannot open the BitTorrent port in the node firewall",
+    )

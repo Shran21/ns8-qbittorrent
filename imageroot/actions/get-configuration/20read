@@ -6,33 +6,13 @@
 #
 
 #
-# Read configuration
+# Return the current configuration. The output uses the same keys as the
+# configure-module input, so the UI can round-trip it.
 #
 
-import os
-import sys
 import json
-import agent
+import sys
 
-# Prepare return variable
-config = {}
+import qbittorrent
 
-# Read current configuration from the environment file
-config["host"] = os.getenv("TRAEFIK_HOST","")
-config["http2https"] = os.getenv("TRAEFIK_HTTP2HTTPS") == "True"
-config["lets_encrypt"] = os.getenv("TRAEFIK_LETS_ENCRYPT") == "True"
-
-# Dump the configuration to stdout
-# json.dump(config, fp=sys.stdout)
-#if os.path.exists("qbittorrent.env"): 
-#	data = agent.read_envfile("qbittorrent.env") 
-#	config["WEBUI_PORT"] = data.get("WEBUI_PORT") 
-#else: 
-#	config["WEBUI_PORT"] = ""  
-
-if os.path.exists("volume-qbittorrent.env"): 
-    data = agent.read_envfile("volume-qbittorrent.env")
-    config["DOWNLOADS_DIR"] = data.get("DOWNLOADS_DIR")
-
-
-json.dump(config, fp=sys.stdout)
+json.dump(qbittorrent.read_settings(), fp=sys.stdout)

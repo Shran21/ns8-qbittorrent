@@ -7,6 +7,13 @@ on:
       - '**/validate-output.json'
       - '**/validator-definitions.json'
 
+# The reusable workflow requests `contents: write` to push the generated
+# apidoc branch. A called workflow can only narrow the permissions the
+# caller hands it, never widen them, so without this block the run fails
+# at startup with no jobs whenever the repository default is read-only.
+permissions:
+  contents: write
+
 jobs:
   build-apidoc:
     uses: NethServer/ns8-github-actions/.github/workflows/build-apidoc.yml@v1

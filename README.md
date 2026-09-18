@@ -1,6 +1,11 @@
 # ns8-qbittorrent
 
-This is a module for [NethServer 8](https://github.com/NethServer/ns8-core).
+A [qBittorrent](https://www.qbittorrent.org/) module for [NethServer 8](https://github.com/NethServer/ns8-core).
+
+It runs the [linuxserver/qbittorrent](https://docs.linuxserver.io/images/docker-qbittorrent/)
+container as a rootless Podman pod, publishes the WebUI through Traefik on a
+virtual host of your choice, and can open the BitTorrent listen port in the
+node firewall.
 
 ## Install
 
@@ -15,120 +20,153 @@ Output example:
 
 ## Configure
 
-Let's assume that the mattermost instance is named `ns8-qbittorrent1`.
+Let's assume the instance is named `ns8-qbittorrent1`.
 
-Launch `configure-module`, by setting the following parameters:
-- `host`: a fully qualified domain name for the application
-- `http2https`: enable or disable HTTP to HTTPS redirection (true/false)
-- `lets_encrypt`: enable or disable Let's Encrypt certificate (true/false)
-- `Downloads Directory`: the absolute path to the download directory used by the application.
+Launch `configure-module`, setting the following parameters:
 
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `host` | yes | – | Fully qualified domain name of the WebUI |
+| `http2https` | yes | – | Redirect HTTP requests to HTTPS |
+| `lets_encrypt` | yes | – | Request a Let's Encrypt certificate |
+| `downloads_dir` | no | `""` | Absolute host path for downloads. Empty means the `qbittorrent-downloads` volume |
+| `bt_port` | no | `6881` | TCP/UDP port for incoming peer connections |
+| `bt_port_enabled` | no | `true` | Open `bt_port` in the public firewall zone |
+| `umask` | no | `002` | Umask applied to downloaded files |
+| `timezone` | no | `UTC` | IANA time zone used inside the container |
 
 Example:
 
 ```
 api-cli run configure-module --agent module/ns8-qbittorrent1 --data - <<EOF
 {
-  "host": "ns8-qbittorrent.domain.com",
+  "host": "qbittorrent.domain.com",
   "http2https": true,
-  "lets_encrypt": false
-  "downloads_dir": "/data/qbittorrent/downloads"
+  "lets_encrypt": false,
+  "bt_port": 6881,
+  "bt_port_enabled": true,
+  "timezone": "Europe/Budapest"
 }
 EOF
 ```
 
 The above command will:
-- start and configure the ns8-qbittorrent instance
-- configure a virtual host for trafik to access the instance
 
-### Setting Up the Downloads Directory
+- store the settings in the module environment
+- open (or close) the BitTorrent port in the node firewall
+- configure a Traefik virtual host for the WebUI
+- start the `ns8-qbittorrent` pod
 
-The `downloads_dir` specifies the directory where the application stores downloaded files. By default, the directory must exist, and the rootless container's user must have the necessary permissions to access it.
+## Storage layout
 
----
+| Container path | Backed by | Included in backup |
+|---|---|---|
+| `/config` | `qbittorrent-config` named volume | **yes** |
+| `/downloads` | `qbittorrent-downloads` named volume, or a host path | **no** |
 
-### Steps to Set Up the Downloads Directory
+The configuration volume holds the application settings, the WebUI
+credentials and the torrent session state (`.torrent` files, resume data,
+categories), so restoring a backup brings the queue back.
 
-1. **Create the Default Directory:**
-   If the directory does not already exist, create it using the `mkdir` command. For example:
-   ```bash
-   mkdir -p /data/qbittorrent/downloads
-   ```
+Downloaded data is deliberately excluded: it can reach hundreds of gigabytes,
+it is re-downloadable by design, and the NS8 backup engine only reaches named
+volumes and the module state directory. Back up that data separately if it
+matters to you.
 
-2. **Set the Correct Permissions:**
-   Assign ownership of the directory to the rootless container user. Replace `<username>` with the user running the container (e.g., `ns8-qbittorrent`):
-   ```bash
-   chown -R <username>:<username> /data/qbittorrent/downloads
-   ```
+### Downloads on an additional disk
 
-3. **Verify Permissions:**
-   Ensure that the directory has the correct permissions:
-   ```bash
-   ls -ld /data/qbittorrent/downloads
-   ```
+The `qbittorrent-downloads` volume carries the `org.nethserver.volumes` label,
+so when the installation node has an additional disk the cluster UI offers to
+store it there during installation. See
+[volumes](https://nethserver.github.io/ns8-core/modules/volumes/).
 
-   Example output:
-   ```
-   drwxr-xr-x 2 ns8-qbittorrent ns8-qbittorrent 4096 Jan 23 20:00 /data/qbittorrent/downloads
-   ```
+### Downloads on a host directory
 
-4. **Specify the Directory in the Configuration:**
-   Pass the `downloads_dir` path when configuring the module:
-   ```bash
-   api-cli run configure-module --agent module/ns8-qbittorrent1 --data - <<EOF
-   {
-     "host": "ns8-qbittorrent.domain.com",
-     "http2https": true,
-     "lets_encrypt": false,
-     "downloads_dir": "/data/qbittorrent/downloads"
-   }
-   EOF
-   ```
-
----
-
-### Example: Granting Permissions to Rootless Container User
-
-If the rootless container user is `ns8-qbittorrent14`, you can grant the necessary permissions as follows:
+Set `downloads_dir` to an absolute path to bind-mount an existing directory
+instead. The directory must already exist and be writable by the module user:
+the container runs as `PUID=0`, which rootless Podman maps to that user on the
+host.
 
 ```bash
+# the module user is the instance name, e.g. ns8-qbittorrent1
 mkdir -p /data/qbittorrent/downloads
-chown -R ns8-qbittorrent14:ns8-qbittorrent14 /data/qbittorrent/downloads
+chown -R ns8-qbittorrent1:ns8-qbittorrent1 /data/qbittorrent/downloads
 ```
 
-Verify the permissions:
-```bash
-ls -ld /data/qbittorrent/downloads
-```
+`configure-module` refuses a path that does not exist or is not writable,
+instead of starting a container that cannot save anything.
 
-Example output:
-```
-drwxr-xr-x 2 ns8-qbittorrent14 ns8-qbittorrent14 4096 Jan 23 20:00 /data/qbittorrent/downloads
-```
+## BitTorrent port
 
----
-### Setting the qBittorrent Admin Password
+Incoming peer connections cannot be proxied by Traefik: they need a port
+reachable from the outside. With `bt_port_enabled` the module opens
+`bt_port` (TCP and UDP) in the *public* firewall zone of the node. You still
+have to forward the same port on the upstream router or gateway.
 
-Upon the first launch, the default admin password for qBittorrent is generated automatically. You can find this password in the **NS8 admin interface system logs**.
+Turn it off if the port is published some other way, or if you accept
+outgoing-only connectivity (torrents still work, but with fewer peers). When
+it is off the pod does not bind the host port at all, so a second instance
+(a clone, or a restore next to the original) can start on the same node.
 
-#### **Important Note:**
-- If the default password is not changed, a new password will be generated every time the container restarts.
+Instances updated from an earlier version start with the port **closed**: an
+update never widens the firewall on its own.
 
-#### **Steps to Change the Password:**
-1. Log in to the qBittorrent web interface using the default admin password from the system logs.
-2. Navigate to the **Options** section.
-3. Under the **Web UI** tab, change the admin password to your desired value.
-4. Save the changes.
+## Reverse proxy support
 
-After setting a new password, it will persist across container restarts.
+On first start, `bin/bootstrap-qbittorrent-config` seeds `qBittorrent.conf`
+so the WebUI works behind Traefik:
 
+- `WebUI\ReverseProxySupportEnabled=true` and
+  `WebUI\TrustedReverseProxiesList=127.0.0.1` — the supported way to run
+  qBittorrent behind a proxy
+- `WebUI\ServerDomains=*` — accept the `Host` header forwarded by Traefik
+- `WebUI\LocalHostAuth=true` and `WebUI\CSRFProtection=true` — authentication
+  and CSRF protection stay on. Traefik connects from `127.0.0.1`, so bypassing
+  authentication for localhost would leave the WebUI open to anyone who can
+  reach the virtual host.
+
+Afterwards the file belongs to you and is left alone, with one exception: the
+BitTorrent listen port is kept in sync on every start, because it is the
+platform that publishes it and opens the firewall.
+
+## qBittorrent admin password
+
+On the very first launch qBittorrent generates a temporary admin password and
+prints it to the container log. Find it in the NS8 **System logs** page, or
+with:
+
+    journalctl --user -u qbittorrent-app -t ns8-qbittorrent1 | grep -i password
+
+Log in, then set a permanent password under **Options → Web UI**. Until you do,
+a new temporary password is generated on every restart.
+
+## Restart the service
+
+From the UI, use the **Restart service** button on the Status page. From the
+command line:
+
+    api-cli run module/ns8-qbittorrent1/restart-services --data '{}'
 
 ## Get the configuration
-You can retrieve the configuration with
 
-```
-api-cli run get-configuration --agent module/ns8-qbittorrent1
-```
+    api-cli run get-configuration --agent module/ns8-qbittorrent1
+
+## Update
+
+Update an installed instance to a newer image:
+
+    update-module ghcr.io/shran21/ns8-qbittorrent:1.0.0 ns8-qbittorrent1
+
+or through the API:
+
+    api-cli run update-module --data '{"module_url":"ghcr.io/shran21/ns8-qbittorrent:1.0.0","instances":["ns8-qbittorrent1"],"force":true}'
+
+Instances created before the volume rework are migrated automatically by
+`update-module.d/10migrate_volumes`: the configuration is copied from the old
+bind-mounted directory into the `qbittorrent-config` volume, the obsolete
+`database.env` and `volume-qbittorrent.env` files are removed, and the new
+settings get their defaults. The old configuration directory is left on disk —
+removing it is your call.
 
 ## Uninstall
 
@@ -136,84 +174,53 @@ To uninstall the instance:
 
     remove-module --no-preserve ns8-qbittorrent1
 
-## Smarthost setting discovery
-
-Some configuration settings, like the smarthost setup, are not part of the
-`configure-module` action input: they are discovered by looking at some
-Redis keys.  To ensure the module is always up-to-date with the
-centralized [smarthost
-setup](https://nethserver.github.io/ns8-core/core/smarthost/) every time
-ns8-qbittorrent starts, the command `bin/discover-smarthost` runs and refreshes
-the `state/smarthost.env` file with fresh values from Redis.
-
-Furthermore if smarthost setup is changed when ns8-qbittorrent is already
-running, the event handler `events/smarthost-changed/10reload_services`
-restarts the main module service.
-
-See also the `systemd/user/ns8-qbittorrent.service` file.
-
-This setting discovery is just an example to understand how the module is
-expected to work: it can be rewritten or discarded completely.
+This also removes the Traefik route and closes the firewall port.
 
 ## Debug
 
-some CLI are needed to debug
+The module runs under an agent that sets a number of environment variables.
+Inspect them from a root terminal:
 
-- The module runs under an agent that initiate a lot of environment variables (in /home/ns8-qbittorrent1/.config/state), it could be nice to verify them
-on the root terminal
+    runagent -m ns8-qbittorrent1 env
 
-    `runagent -m ns8-qbittorrent1 env`
+Become the module user to run scripts with the same environment:
 
-- you can become runagent for testing scripts and initiate all environment variables
-  
-    `runagent -m ns8-qbittorrent1`
+    runagent -m ns8-qbittorrent1
 
- the path become : 
+Then inspect the containers:
+
 ```
-    echo $PATH
-    /home/ns8-qbittorrent1/.config/bin:/usr/local/agent/pyenv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/usr/
-```
-
-- if you want to debug a container or see environment inside
- `runagent -m ns8-qbittorrent1`
- ```
 podman ps
-CONTAINER ID  IMAGE                                      COMMAND               CREATED        STATUS        PORTS                    NAMES
-d292c6ff28e9  localhost/podman-pause:4.6.1-1702418000                          9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  80b8de25945f-infra
-d8df02bf6f4a  docker.io/library/mariadb:10.11.5          --character-set-s...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  mariadb-app
-9e58e5bd676f  docker.io/library/nginx:stable-alpine3.17  nginx -g daemon o...  9 minutes ago  Up 9 minutes  127.0.0.1:20015->80/tcp  ns8-qbittorrent-app
+CONTAINER ID  IMAGE                                                        COMMAND     CREATED        STATUS        PORTS                     NAMES
+d292c6ff28e9  localhost/podman-pause:4.6.1-1702418000                                  9 minutes ago  Up 9 minutes  127.0.0.1:20015->8080/tcp  a1b2c3d4e5f6-infra
+9e58e5bd676f  docker.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls476        /init       9 minutes ago  Up 9 minutes  127.0.0.1:20015->8080/tcp  qbittorrent-app
 ```
 
-you can see what environment variable is inside the container
-```
-podman exec  ns8-qbittorrent-app env
-PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-TERM=xterm
-PKG_RELEASE=1
-MARIADB_DB_HOST=127.0.0.1
-MARIADB_DB_NAME=ns8-qbittorrent
-MARIADB_IMAGE=docker.io/mariadb:10.11.5
-MARIADB_DB_TYPE=mysql
-container=podman
-NGINX_VERSION=1.24.0
-NJS_VERSION=0.7.12
-MARIADB_DB_USER=ns8-qbittorrent
-MARIADB_DB_PASSWORD=ns8-qbittorrent
-MARIADB_DB_PORT=3306
-HOME=/root
-```
+Check the environment inside the container:
 
-you can run a shell inside the container
+    podman exec qbittorrent-app env
 
-```
-podman exec -ti   ns8-qbittorrent-app sh
-/ # 
-```
+Open a shell inside the container:
+
+    podman exec -ti qbittorrent-app bash
+
+Find the configuration volume on disk:
+
+    podman volume inspect --format '{{.Mountpoint}}' qbittorrent-config
+
 ## Testing
 
 Test the module using the `test-module.sh` script:
 
+    ./test-module.sh <NODE_ADDR> ghcr.io/shran21/ns8-qbittorrent:latest
 
-    ./test-module.sh <NODE_ADDR> ghcr.io/nethserver/ns8-qbittorrent:latest
+The tests are written with [Robot Framework](https://robotframework.org/).
 
-The tests are made using [Robot Framework](https://robotframework.org/)
+## UI translation
+
+Translated with [Weblate](https://hosted.weblate.org/projects/ns8/).
+
+To set up the translation process:
+
+- add the [GitHub Weblate app](https://docs.weblate.org/en/latest/admin/continuous.html#github-setup) to the repository
+- add the repository to [hosted.weblate.org](https://hosted.weblate.org) or ask a NethServer developer to add it to the ns8 Weblate project
