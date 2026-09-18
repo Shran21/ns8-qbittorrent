@@ -18,10 +18,4 @@ import qbittorrent
 
 data = json.load(sys.stdin)
 
-qbittorrent.set_many({
-    "DOWNLOADS_MOUNT": qbittorrent.build_downloads_mount(data.get("downloads_dir", "")),
-    "BT_PORT": str(data.get("bt_port", qbittorrent.DEFAULT_BT_PORT)),
-    "BT_PORT_ENABLED": "1" if data.get("bt_port_enabled", True) else "",
-    "UMASK": data.get("umask", qbittorrent.DEFAULT_UMASK),
-    "TZ": data.get("timezone", qbittorrent.DEFAULT_TZ),
-})
+qbittorrent.set_many(qbittorrent.settings_env(data))

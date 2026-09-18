@@ -84,15 +84,14 @@ def main():
                   f"switching to the {qbittorrent.DOWNLOADS_VOLUME} volume", file=sys.stderr)
         downloads_dir = ""
 
-    qbittorrent.set_many({
-        "DOWNLOADS_MOUNT": qbittorrent.build_downloads_mount(downloads_dir),
-        "BT_PORT": str(qbittorrent.DEFAULT_BT_PORT),
+    qbittorrent.set_many(qbittorrent.settings_env({
+        "downloads_dir": downloads_dir,
+        "bt_port": qbittorrent.DEFAULT_BT_PORT,
         # The BitTorrent port was never opened before this version: keep it
-        # closed, so an update never widens the firewall on its own.
-        "BT_PORT_ENABLED": "",
-        "UMASK": qbittorrent.DEFAULT_UMASK,
-        "TZ": qbittorrent.DEFAULT_TZ,
-    })
+        # closed, so an update never widens the firewall on its own and
+        # never binds a host port the administrator did not ask for.
+        "bt_port_enabled": False,
+    }))
 
     # WEBUI_PORT was written by an old step but never reached the container.
     qbittorrent.unset_many(["WEBUI_PORT", "CONFIG_DIR", "DOWNLOADS_DIR"])

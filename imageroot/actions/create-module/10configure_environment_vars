@@ -12,11 +12,4 @@
 
 import qbittorrent
 
-qbittorrent.set_many({
-    "DOWNLOADS_MOUNT": qbittorrent.build_downloads_mount(""),
-    "BT_PORT": str(qbittorrent.DEFAULT_BT_PORT),
-    "BT_PORT_ENABLED": "1",
-    "UMASK": qbittorrent.DEFAULT_UMASK,
-    "TZ": qbittorrent.DEFAULT_TZ,
-})
-
+qbittorrent.set_many(qbittorrent.settings_env({}))

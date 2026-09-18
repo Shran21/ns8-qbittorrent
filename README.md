@@ -104,7 +104,9 @@ reachable from the outside. With `bt_port_enabled` the module opens
 have to forward the same port on the upstream router or gateway.
 
 Turn it off if the port is published some other way, or if you accept
-outgoing-only connectivity (torrents still work, but with fewer peers).
+outgoing-only connectivity (torrents still work, but with fewer peers). When
+it is off the pod does not bind the host port at all, so a second instance
+(a clone, or a restore next to the original) can start on the same node.
 
 Instances updated from an earlier version start with the port **closed**: an
 update never widens the firewall on its own.

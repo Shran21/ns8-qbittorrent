@@ -12,8 +12,10 @@ stored raw -- they are not quoted nor escaped -- user supplied values are
 validated strictly before being stored.
 """
 
+import errno
 import os
 import re
+import socket
 
 import agent
 
@@ -99,6 +101,57 @@ def read_settings(environ=None):
         "bt_port_enabled": environ.get("BT_PORT_ENABLED", "1") == "1",
         "umask": environ.get("UMASK", DEFAULT_UMASK),
         "timezone": environ.get("TZ", DEFAULT_TZ),
+    }
+
+
+def build_bt_publish(bt_port, enabled):
+    """Return the `podman pod create` publish arguments for the BitTorrent port.
+
+    The unit expands this with $BT_PUBLISH (unbraced), which systemd splits
+    on whitespace, so an empty value means "publish nothing". Publishing
+    the port unconditionally and relying on the firewall to block it would
+    still bind the host port, which breaks a clone or a migrated instance
+    that deliberately keeps the port closed while the original still holds
+    it.
+    """
+    if not enabled:
+        return ""
+    return f"--publish={bt_port}:{bt_port}/tcp --publish={bt_port}:{bt_port}/udp"
+
+
+def port_in_use(port):
+    """True when the port is already bound on this host.
+
+    Both protocols are tested, because the pod publishes the BitTorrent
+    port over TCP and UDP alike and `podman pod create` fails if either one
+    is taken. Address families that the kernel does not offer are skipped
+    rather than raised: a node with IPv6 disabled must still be able to
+    validate a port.
+    """
+    for family in (socket.AF_INET, socket.AF_INET6):
+        for socktype in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            try:
+                with socket.socket(family, socktype) as sock:
+                    sock.bind(("", port))
+            except OSError as ex:
+                if ex.errno == errno.EADDRINUSE:
+                    return True
+                continue
+    return False
+
+
+def settings_env(settings):
+    """Map a settings dict (the configure-module input shape) to the
+    environment variables the Systemd units read."""
+    bt_port = int(settings.get("bt_port", DEFAULT_BT_PORT))
+    bt_port_enabled = bool(settings.get("bt_port_enabled", True))
+    return {
+        "DOWNLOADS_MOUNT": build_downloads_mount(settings.get("downloads_dir", "")),
+        "BT_PORT": str(bt_port),
+        "BT_PORT_ENABLED": "1" if bt_port_enabled else "",
+        "BT_PUBLISH": build_bt_publish(bt_port, bt_port_enabled),
+        "UMASK": settings.get("umask") or DEFAULT_UMASK,
+        "TZ": settings.get("timezone") or DEFAULT_TZ,
     }
 
 

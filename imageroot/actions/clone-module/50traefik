@@ -21,7 +21,7 @@ settings = qbittorrent.read_settings()
 # Two instances cannot listen on the same BitTorrent port, and the clone
 # has no say over which one wins: leave the port closed and let the
 # administrator pick a free one from the Settings page.
-if agent.tcp_port_in_use(settings['bt_port']):
+if qbittorrent.port_in_use(settings['bt_port']):
     print(
         f"WARNING: BitTorrent port {settings['bt_port']} is already in use on this node. "
         "The clone starts with the port closed: choose a free one from the Settings page.",

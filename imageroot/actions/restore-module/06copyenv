@@ -17,21 +17,18 @@ import json
 import qbittorrent
 
 request = json.load(sys.stdin)
-original_environment = request['environment']
+renv = request['environment']
 
-restored = {}
-for evar, fallback in [
-    ("TRAEFIK_HOST", ""),
-    ("TRAEFIK_HTTP2HTTPS", "True"),
-    ("TRAEFIK_LETS_ENCRYPT", "False"),
-    ("DOWNLOADS_MOUNT", qbittorrent.build_downloads_mount("")),
-    ("BT_PORT", str(qbittorrent.DEFAULT_BT_PORT)),
-    ("BT_PORT_ENABLED", "1"),
-    ("UMASK", qbittorrent.DEFAULT_UMASK),
-    ("TZ", qbittorrent.DEFAULT_TZ),
-]:
-    # A backup taken before a given setting existed simply has no such
-    # variable: fall back to the default instead of failing the restore.
-    restored[evar] = original_environment.get(evar, fallback)
+# read_settings() fills in the default for anything a backup taken by an
+# older version does not carry, and settings_env() recomputes the derived
+# variables rather than copying possibly stale ones.
+settings = qbittorrent.read_settings(renv)
+
+restored = qbittorrent.settings_env(settings)
+restored.update({
+    "TRAEFIK_HOST": renv.get("TRAEFIK_HOST", ""),
+    "TRAEFIK_HTTP2HTTPS": renv.get("TRAEFIK_HTTP2HTTPS", "True"),
+    "TRAEFIK_LETS_ENCRYPT": renv.get("TRAEFIK_LETS_ENCRYPT", "False"),
+})
 
 qbittorrent.set_many(restored)

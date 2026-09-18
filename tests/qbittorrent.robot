@@ -70,6 +70,37 @@ Check if the BitTorrent port is open in the firewall
     Should Contain    ${output}    ${BT_PORT}/tcp
     Should Contain    ${output}    ${BT_PORT}/udp
 
+Check if disabling the port unbinds it
+    # The pod must not publish the port at all when the toggle is off:
+    # binding it anyway would block a clone or a migrated instance that
+    # deliberately keeps the port closed while another one still holds it.
+    ${rc} =    Execute Command
+    ...    api-cli run module/${module_id}/configure-module --data '{"host":"${TEST_FQDN}","http2https":false,"lets_encrypt":false,"bt_port":${BT_PORT},"bt_port_enabled":false}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+    ${output} =    Execute Command    ss -Hlnt "sport = :${BT_PORT}" ; ss -Hlnu "sport = :${BT_PORT}"
+    Should Be Empty    ${output}
+    ${ports} =    Execute Command    firewall-cmd --zone=public --list-ports
+    Should Not Contain    ${ports}    ${BT_PORT}/tcp
+
+Check if the port is bound again when re-enabled
+    ${rc} =    Execute Command
+    ...    api-cli run module/${module_id}/configure-module --data '{"host":"${TEST_FQDN}","http2https":false,"lets_encrypt":false,"bt_port":${BT_PORT},"bt_port_enabled":true}'
+    ...    return_rc=True  return_stdout=False
+    Should Be Equal As Integers    ${rc}  0
+    # Re-applying the same enabled port must not trip the conflict check:
+    # our own running pod is the one holding it.
+    ${output} =    Execute Command    ss -Hlnt "sport = :${BT_PORT}"
+    Should Not Be Empty    ${output}
+
+Check if a port taken by another service is rejected
+    # Occupy the candidate port over UDP only: a TCP-only probe would miss it
+    Execute Command    (nohup timeout 60 nc -u -l 39999 >/dev/null 2>&1 &) ; sleep 1
+    ${rc} =    Execute Command
+    ...    api-cli run module/${module_id}/configure-module --data '{"host":"${TEST_FQDN}","http2https":false,"lets_encrypt":false,"bt_port":39999,"bt_port_enabled":true}'
+    ...    return_rc=True  return_stdout=False
+    Should Not Be Equal As Integers    ${rc}  0
+
 Check if the service can be restarted from the UI action
     ${rc} =    Execute Command    api-cli run module/${module_id}/restart-services --data '{}'
     ...    return_rc=True  return_stdout=False

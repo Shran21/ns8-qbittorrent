@@ -13,6 +13,7 @@
 
 import json
 import os
+import subprocess
 import sys
 
 import agent
@@ -43,12 +44,36 @@ if downloads_error:
         "error": downloads_error,
     })
 
+def service_is_active():
+    return subprocess.run(
+        ["systemctl", "--user", "-q", "is-active", "ns8-qbittorrent.service"],
+        check=False,
+    ).returncode == 0
+
+
+def we_already_hold(bt_port):
+    """True when the port we are about to bind is the one our own running
+    pod is already publishing.
+
+    Matching the stored BT_PORT is not enough on its own: a freshly created
+    instance stores the default port before its service exists, so a port
+    taken by some other service would slip through unchecked.
+    """
+    return (
+        str(bt_port) == os.environ.get("BT_PORT", "")
+        and os.environ.get("BT_PORT_ENABLED", "") == "1"
+        and service_is_active()
+    )
+
+
 bt_port = data.get("bt_port", qbittorrent.DEFAULT_BT_PORT)
+bt_port_enabled = data.get("bt_port_enabled", True)
 bt_port_error = qbittorrent.validate_bt_port(bt_port)
-if not bt_port_error and bt_port != int(os.environ.get("BT_PORT", 0)):
-    # Skip the check when the port did not change: our own running
-    # container is holding it, and it would always look busy.
-    if agent.tcp_port_in_use(bt_port):
+# A disabled port is never published, so it cannot clash with anything.
+if not bt_port_error and bt_port_enabled and not we_already_hold(bt_port):
+    # qbittorrent.port_in_use() probes TCP and UDP: the pod publishes both
+    # and `podman pod create` fails if either one is taken.
+    if qbittorrent.port_in_use(bt_port):
         bt_port_error = "bt_port_in_use"
 if bt_port_error:
     errors.append({
