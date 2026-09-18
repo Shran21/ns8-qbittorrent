@@ -2,11 +2,11 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Restart ns8-qbittorrent services",
     "$id": "http://nethserver.org/json-schema/task/input/ns8-qbittorrent/restart-services",
-    "description": "Restart the qBittorrent pod and container. The action takes no parameter.",
+    "description": "Restart the qBittorrent pod and container. The action takes no parameter: an empty object and a missing payload are both accepted.",
     "examples": [
         {}
     ],
-    "type": "object",
+    "type": ["object", "null"],
     "additionalProperties": false,
     "properties": {}
 }

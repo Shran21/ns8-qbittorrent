@@ -445,6 +445,9 @@ export default {
       const res = await to(
         this.createModuleTaskForApp(this.instanceName, {
           action: taskAction,
+          // The action takes no parameter, but the payload has to be sent:
+          // a missing "data" key reaches the agent as JSON null.
+          data: {},
           extra: {
             title: this.$t("action." + taskAction),
             description: this.$t("status.restarting"),
