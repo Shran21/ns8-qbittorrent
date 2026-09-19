@@ -53,7 +53,19 @@ buildah add "${container}" ui/dist /ui
 #   be forwarded on the upstream router), so it is not allocated here.
 # - volumes: qbittorrent-downloads is offered for assignment to an
 #   additional disk, because downloaded data is the part that grows.
+# The org.opencontainers.* annotations are what the ghcr.io package page
+# reads: image.source links the package to this repository and makes its
+# README -- which documents `add-module`, the command NS8 actually uses --
+# show up on the package page. GitHub always prints a `docker pull` line
+# there; that part is fixed and cannot be changed.
 buildah config --entrypoint=/ \
+    --label="org.opencontainers.image.title=ns8-qbittorrent" \
+    --label="org.opencontainers.image.description=qBittorrent for NethServer 8: install with 'add-module ghcr.io/shran21/ns8-qbittorrent:latest 1'" \
+    --label="org.opencontainers.image.source=https://github.com/Shran21/ns8-qbittorrent" \
+    --label="org.opencontainers.image.url=https://github.com/Shran21/ns8-qbittorrent" \
+    --label="org.opencontainers.image.documentation=https://github.com/Shran21/ns8-qbittorrent#readme" \
+    --label="org.opencontainers.image.licenses=GPL-3.0-or-later" \
+    --label="org.opencontainers.image.version=${IMAGETAG:-latest}" \
     --label="org.nethserver.authorizations=traefik@node:routeadm node:fwadm" \
     --label="org.nethserver.tcp-ports-demand=1" \
     --label="org.nethserver.rootfull=0" \
