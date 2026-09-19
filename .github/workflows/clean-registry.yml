@@ -12,10 +12,27 @@ jobs:
     name: "Delete ghcr.io images ${{ github.event.ref }}"
     runs-on: ubuntu-latest
     environment: Registry
+    env:
+      CLEANUP_TOKEN: ${{ secrets.IMAGES_CLEANUP_TOKEN }}
     steps:
-      - uses: NethServer/ns8-github-actions/.github/actions/delete-image@v1
+      # Deleting a package version needs a PAT with the delete:packages
+      # scope: the built-in GITHUB_TOKEN cannot do it, which is why the
+      # action takes a token of its own. Handed an empty one, `gh auth
+      # login --with-token` falls back to the interactive device flow,
+      # prints a one-time code and waits a quarter of an hour for a browser
+      # that never arrives, then fails. Check first and say so instead.
+      - id: token
+        run: |
+          if [ -z "${CLEANUP_TOKEN}" ]; then
+            echo "::warning title=Registry cleanup skipped::IMAGES_CLEANUP_TOKEN is not set, so the image tag for '${{ github.event.ref }}' is left in ghcr.io. Add a personal access token with the delete:packages scope as a repository secret to enable automatic cleanup."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.available == 'true'
+        uses: NethServer/ns8-github-actions/.github/actions/delete-image@v1
         with:
           # Must match the image name built by build-images.sh, otherwise
           # deleting a branch leaves its image tag behind in ghcr.io.
           images: "ns8-qbittorrent"
-          delete_image_token: ${{ secrets.IMAGES_CLEANUP_TOKEN }}
+          delete_image_token: ${{ env.CLEANUP_TOKEN }}
