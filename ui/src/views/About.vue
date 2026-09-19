@@ -126,7 +126,6 @@
                   <cv-link
                     v-if="app.authors[0].email"
                     :href="'mailto:' + app.authors[0].email"
-                    target="_blank"
                     class="email"
                   >
                     {{ app.authors[0].email }}
@@ -142,7 +141,6 @@
                     <cv-link
                       v-if="author.email"
                       :href="'mailto:' + author.email"
-                      target="_blank"
                       class="email"
                     >
                       {{ author.email }}

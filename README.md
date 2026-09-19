@@ -246,6 +246,14 @@ Test the module using the `test-module.sh` script:
 
 The tests are written with [Robot Framework](https://robotframework.org/).
 
+## Support
+
+Bug reports and feature requests belong in the
+[issue tracker](https://github.com/Shran21/ns8-qbittorrent/issues), where
+they stay searchable for everyone.
+
+For anything else: [shranit.dev@gmail.com](mailto:shranit.dev@gmail.com)
+
 ## UI translation
 
 Translated with [Weblate](https://hosted.weblate.org/projects/ns8/).
