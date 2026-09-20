@@ -32,6 +32,7 @@ Launch `configure-module`, setting the following parameters:
 | `downloads_dir` | no | `""` | Absolute host path for downloads. Empty means the `qbittorrent-downloads` volume |
 | `bt_port` | no | `6881` | TCP/UDP port for incoming peer connections |
 | `bt_port_enabled` | no | `true` | Open `bt_port` in the public firewall zone |
+| `auth_whitelist` | no | `""` | Comma separated subnets whose clients reach the WebUI without a password |
 | `umask` | no | `002` | Umask applied to downloaded files |
 | `timezone` | no | `UTC` | IANA time zone used inside the container |
 
@@ -110,6 +111,24 @@ it is off the pod does not bind the host port at all, so a second instance
 
 Instances updated from an earlier version start with the port **closed**: an
 update never widens the firewall on its own.
+
+## Trusted networks
+
+`auth_whitelist` takes a comma separated list of subnets in CIDR notation,
+for instance `192.168.0.0/24`. Clients coming from them reach the WebUI
+without logging in; everyone else is asked for a password. An empty value
+always requires authentication.
+
+This only works because the module also turns on qBittorrent's reverse
+proxy support: Traefik forwards every request from `127.0.0.1`, so without
+`WebUI\ReverseProxySupportEnabled` and `WebUI\TrustedReverseProxiesList`
+the list would be matched against the proxy rather than the client, and a
+LAN subnet could never match. Whitelisting `127.0.0.1` instead is not a
+workaround: it would let in everyone who can reach the virtual host.
+
+The module writes these keys on every start, so set the list here rather
+than in the qBittorrent WebUI. A list that was already configured in the
+WebUI is adopted as a module setting by the first update, not discarded.
 
 ## Reverse proxy support
 
@@ -190,6 +209,11 @@ Update an installed instance to a newer image:
 or through the API:
 
     api-cli run update-module --data '{"module_url":"ghcr.io/shran21/ns8-qbittorrent:2.0.0","instances":["ns8-qbittorrent1"],"force":true}'
+
+An update never resets what you configured. `update-module.d/15sync_settings`
+reads the current settings back and writes them out again, so an option
+introduced by a newer version arrives with its default while every existing
+value survives. Running `update-module` is all that is needed.
 
 Instances created before the volume rework are migrated automatically by
 `update-module.d/10migrate_volumes`: the configuration is copied from the old

@@ -13,6 +13,7 @@ validated strictly before being stored.
 """
 
 import errno
+import ipaddress
 import os
 import re
 import socket
@@ -79,6 +80,33 @@ def validate_downloads_dir(downloads_dir):
     return None
 
 
+def parse_auth_whitelist(value):
+    """Split a comma separated subnet list into normalised CIDR strings.
+
+    Raises ValueError on anything that is not a network, so the caller can
+    turn it into a validation error instead of writing a list qBittorrent
+    would silently ignore.
+    """
+    subnets = []
+    for chunk in (value or "").replace(";", ",").split(","):
+        chunk = chunk.strip()
+        if not chunk:
+            continue
+        # strict=False accepts 192.168.0.1/24 and normalises it to the
+        # network address, which is what an administrator usually means.
+        subnets.append(str(ipaddress.ip_network(chunk, strict=False)))
+    return subnets
+
+
+def validate_auth_whitelist(value):
+    """Return an error identifier, or None when the list is acceptable."""
+    try:
+        parse_auth_whitelist(value)
+    except ValueError:
+        return "auth_whitelist_invalid"
+    return None
+
+
 def validate_bt_port(bt_port):
     """Return an error identifier, or None when the port is acceptable."""
     if not isinstance(bt_port, int) or isinstance(bt_port, bool):
@@ -101,6 +129,7 @@ def read_settings(environ=None):
         "bt_port_enabled": environ.get("BT_PORT_ENABLED", "1") == "1",
         "umask": environ.get("UMASK", DEFAULT_UMASK),
         "timezone": environ.get("TZ", DEFAULT_TZ),
+        "auth_whitelist": environ.get("AUTH_WHITELIST", ""),
     }
 
 
@@ -152,6 +181,8 @@ def settings_env(settings):
         "BT_PUBLISH": build_bt_publish(bt_port, bt_port_enabled),
         "UMASK": settings.get("umask") or DEFAULT_UMASK,
         "TZ": settings.get("timezone") or DEFAULT_TZ,
+        # Comma separated CIDR list. Empty means "always ask for a password".
+        "AUTH_WHITELIST": ",".join(parse_auth_whitelist(settings.get("auth_whitelist", ""))),
     }
 
 

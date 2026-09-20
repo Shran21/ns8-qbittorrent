@@ -12,7 +12,8 @@
             "bt_port": 6881,
             "bt_port_enabled": true,
             "umask": "002",
-            "timezone": "Europe/Budapest"
+            "timezone": "Europe/Budapest",
+            "auth_whitelist": "192.168.0.0/24"
         }
     ],
     "type": "object",
@@ -73,6 +74,12 @@
             "description": "IANA time zone used inside the container, like 'Europe/Budapest'.",
             "pattern": "^[A-Za-z0-9._+-]+(/[A-Za-z0-9._+-]+)*$",
             "default": "UTC"
+        },
+        "auth_whitelist": {
+            "type": "string",
+            "title": "Trusted networks",
+            "description": "Comma separated list of subnets in CIDR notation whose clients reach the WebUI without a password, for instance '192.168.0.0/24'. Leave empty to always require authentication. Because Traefik forwards every request from 127.0.0.1, the module also turns on qBittorrent's reverse proxy support so the list is matched against the real client address.",
+            "default": ""
         }
     }
 }

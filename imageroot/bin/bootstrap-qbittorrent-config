@@ -23,6 +23,12 @@ import sys
 
 VOLUME_NAME = "qbittorrent-config"
 
+# Dropped next to the configuration we create from scratch. It tells
+# update-module.d/10migrate_volumes that nothing in this volume came from
+# the administrator yet, so a legacy configuration may still be copied
+# over it. The migration removes the marker once it has done so.
+SEED_MARKER = ".ns8-seeded"
+
 # Values written only when the configuration file does not exist yet.
 #
 # WebUI\LocalHostAuth is deliberately "true": Traefik connects from
@@ -77,6 +83,38 @@ def make_parser():
     return parser
 
 
+def desired_settings():
+    """Settings the module owns, re-applied on every start.
+
+    The administrator owns the rest of qBittorrent.conf. These few keys are
+    different: the platform publishes the listen port and opens it in the
+    firewall, and the subnet whitelist is a module option, so the file has
+    to follow them rather than the other way round.
+    """
+    wanted = {"BitTorrent": {r"Session\Port": os.environ.get("BT_PORT", "6881")}}
+
+    whitelist = os.environ.get("AUTH_WHITELIST")
+    if whitelist is None:
+        # The module does not manage the whitelist on this instance yet
+        # (it predates the option). Leave whatever the file says alone.
+        return wanted
+
+    if whitelist:
+        wanted["Preferences"] = {
+            r"WebUI\AuthSubnetWhitelistEnabled": "true",
+            r"WebUI\AuthSubnetWhitelist": whitelist,
+            # Behind Traefik every request arrives from 127.0.0.1. Without
+            # these two the whitelist would be matched against the proxy
+            # instead of the client, so it could never match a LAN subnet.
+            r"WebUI\ReverseProxySupportEnabled": "true",
+            r"WebUI\TrustedReverseProxiesList": "127.0.0.1",
+        }
+    else:
+        wanted["Preferences"] = {r"WebUI\AuthSubnetWhitelistEnabled": "false"}
+
+    return wanted
+
+
 def main():
     try:
         mountpoint = volume_mountpoint(VOLUME_NAME)
@@ -84,7 +122,6 @@ def main():
         print(f"Cannot prepare the {VOLUME_NAME} volume: {ex}", file=sys.stderr)
         return 1
 
-    bt_port = os.environ.get("BT_PORT", "6881")
     conf_dir = os.path.join(mountpoint, "qBittorrent")
     conf_file = os.path.join(conf_dir, "qBittorrent.conf")
 
@@ -103,13 +140,18 @@ def main():
             print(f"Cannot parse {conf_file}, leaving it untouched: {ex}", file=sys.stderr)
             return 0
 
-    if not parser.has_section("BitTorrent"):
-        parser.add_section("BitTorrent")
-    if parser.get("BitTorrent", r"Session\Port", fallback=None) != bt_port:
-        parser.set("BitTorrent", r"Session\Port", bt_port)
-        print(f"Set BitTorrent listen port to {bt_port}", file=sys.stderr)
-    elif not is_new:
-        return 0  # nothing to write
+    changed = is_new
+    for section, entries in desired_settings().items():
+        if not parser.has_section(section):
+            parser.add_section(section)
+        for key, value in entries.items():
+            if parser.get(section, key, fallback=None) != value:
+                parser.set(section, key, value)
+                print(f"Set {section}/{key} to {value}", file=sys.stderr)
+                changed = True
+
+    if not changed:
+        return 0
 
     try:
         os.makedirs(conf_dir, exist_ok=True)
@@ -118,9 +160,12 @@ def main():
         with open(conf_file + ".tmp", "w", encoding="utf-8") as fp:
             parser.write(fp, space_around_delimiters=False)
         os.replace(conf_file + ".tmp", conf_file)
+        if is_new:
+            with open(os.path.join(mountpoint, SEED_MARKER), "w") as fp:
+                fp.write("Configuration created by bootstrap-qbittorrent-config\n")
     except OSError as ex:
         print(f"Cannot write {conf_file}: {ex}", file=sys.stderr)
-        return 0 if not is_new else 1
+        return 1 if is_new else 0
 
     return 0
 

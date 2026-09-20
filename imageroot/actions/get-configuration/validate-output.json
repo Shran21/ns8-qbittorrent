@@ -12,7 +12,8 @@
             "bt_port": 6881,
             "bt_port_enabled": true,
             "umask": "002",
-            "timezone": "Europe/Budapest"
+            "timezone": "Europe/Budapest",
+            "auth_whitelist": "192.168.0.0/24"
         }
     ],
     "type": "object",
@@ -24,7 +25,8 @@
         "bt_port",
         "bt_port_enabled",
         "umask",
-        "timezone"
+        "timezone",
+        "auth_whitelist"
     ],
     "properties": {
         "host": {
@@ -66,6 +68,11 @@
             "type": "string",
             "title": "Time zone",
             "description": "IANA time zone used inside the container."
+        },
+        "auth_whitelist": {
+            "type": "string",
+            "title": "Trusted networks",
+            "description": "Subnets whose clients reach the WebUI without a password. Empty when authentication is always required."
         }
     }
 }

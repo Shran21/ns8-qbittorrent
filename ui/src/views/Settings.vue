@@ -77,6 +77,17 @@
                 $t("settings.enabled")
               }}</template>
             </cv-toggle>
+            <cv-text-input
+              :label="$t('settings.auth_whitelist')"
+              :helper-text="$t('settings.auth_whitelist_helper')"
+              placeholder="192.168.0.0/24"
+              v-model.trim="authWhitelist"
+              class="mg-bottom maxwidth"
+              :invalid-message="$t(error.auth_whitelist)"
+              :disabled="loading.getConfiguration || loading.configureModule"
+              ref="auth_whitelist"
+            >
+            </cv-text-input>
             <cv-number-input
               :label="$t('settings.bt_port')"
               :helper-text="$t('settings.bt_port_helper')"
@@ -194,6 +205,7 @@ export default {
       urlCheckInterval: null,
       host: "",
       downloadsDir: "",
+      authWhitelist: "",
       btPort: DEFAULT_BT_PORT,
       isBtPortEnabled: true,
       umask: "002",
@@ -209,6 +221,7 @@ export default {
         configureModule: "",
         host: "",
         downloads_dir: "",
+        auth_whitelist: "",
         bt_port: "",
         bt_port_enabled: "",
         umask: "",
@@ -284,6 +297,7 @@ export default {
       // volume is in use: keep the field empty so that saving the form
       // does not silently turn it into a bind mount.
       this.downloadsDir = config.downloads_dir || "";
+      this.authWhitelist = config.auth_whitelist || "";
       this.btPort = config.bt_port || DEFAULT_BT_PORT;
       this.isBtPortEnabled = config.bt_port_enabled;
       this.umask = config.umask;
@@ -324,6 +338,15 @@ export default {
         !/^\/[A-Za-z0-9._@+-]+(\/[A-Za-z0-9._@+-]+)*$/.test(this.downloadsDir)
       ) {
         setError("downloads_dir", "settings.downloads_dir_invalid");
+      }
+
+      if (
+        this.authWhitelist &&
+        !/^\s*[0-9a-fA-F.:]+\/\d{1,3}(\s*,\s*[0-9a-fA-F.:]+\/\d{1,3})*\s*$/.test(
+          this.authWhitelist
+        )
+      ) {
+        setError("auth_whitelist", "settings.auth_whitelist_invalid");
       }
 
       if (!/^[0-7]{3,4}$/.test(this.umask)) {
@@ -384,6 +407,7 @@ export default {
           data: {
             host: this.host,
             downloads_dir: this.downloadsDir,
+            auth_whitelist: this.authWhitelist,
             bt_port: Number(this.btPort),
             bt_port_enabled: this.isBtPortEnabled,
             umask: this.umask,

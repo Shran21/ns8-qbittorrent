@@ -83,6 +83,16 @@ if bt_port_error:
         "error": bt_port_error,
     })
 
+auth_whitelist = data.get("auth_whitelist", "")
+auth_whitelist_error = qbittorrent.validate_auth_whitelist(auth_whitelist)
+if auth_whitelist_error:
+    errors.append({
+        "field": "auth_whitelist",
+        "parameter": "auth_whitelist",
+        "value": auth_whitelist,
+        "error": auth_whitelist_error,
+    })
+
 if errors:
     agent.set_status('validation-failed')
     json.dump(errors, fp=sys.stdout)

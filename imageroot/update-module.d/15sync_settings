@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+
+#
+# Copyright (C) 2025 Nethesis S.r.l.
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+
+#
+# Carry this instance's settings across the update.
+#
+# An update must never reset what the administrator configured. Reading the
+# settings back and writing them out again does exactly that:
+# read_settings() falls back to a default only for what the environment
+# does not carry yet, so an option introduced by a new version arrives with
+# its default while every existing value survives untouched.
+#
+# It also adopts settings the module has only just started to manage, so
+# that taking ownership of a qBittorrent.conf key does not throw away what
+# the administrator already put there.
+#
+
+import configparser
+import os
+import subprocess
+import sys
+
+import qbittorrent
+
+
+def qbittorrent_conf():
+    """Path of the live qBittorrent.conf, or None when there is none yet."""
+    try:
+        mountpoint = subprocess.run(
+            ["podman", "volume", "inspect", "--format", "{{.Mountpoint}}",
+             qbittorrent.CONFIG_VOLUME],
+            check=True, text=True, capture_output=True,
+        ).stdout.strip()
+    except subprocess.CalledProcessError:
+        return None  # the volume does not exist yet
+    path = os.path.join(mountpoint, "qBittorrent", "qBittorrent.conf")
+    return path if os.path.isfile(path) else None
+
+
+def adopt_auth_whitelist(settings):
+    """Import a whitelist that was configured in the qBittorrent WebUI.
+
+    Until this version the subnet whitelist could only be set there. The
+    module now writes those keys on every start, so an existing list has to
+    become the module setting first -- otherwise the first restart after
+    the update would quietly erase it.
+    """
+    if "AUTH_WHITELIST" in os.environ:
+        return  # already a module setting, nothing to adopt
+
+    conf = qbittorrent_conf()
+    if conf is None:
+        return
+
+    parser = configparser.ConfigParser(interpolation=None)
+    parser.optionxform = str
+    try:
+        parser.read(conf, encoding="utf-8")
+    except configparser.Error as ex:
+        print(f"Cannot parse {conf}: {ex}", file=sys.stderr)
+        return
+
+    enabled = parser.get("Preferences", r"WebUI\AuthSubnetWhitelistEnabled",
+                         fallback="false").strip().lower() == "true"
+    subnets = parser.get("Preferences", r"WebUI\AuthSubnetWhitelist", fallback="")
+    if not enabled or not subnets.strip():
+        return
+
+    if qbittorrent.validate_auth_whitelist(subnets) is not None:
+        print(f"Not adopting the unparsable subnet whitelist {subnets!r} from {conf}",
+              file=sys.stderr)
+        return
+
+    settings["auth_whitelist"] = subnets
+    print(f"Adopted the subnet whitelist {subnets!r} from {conf} as a module setting",
+          file=sys.stderr)
+
+
+settings = qbittorrent.read_settings()
+adopt_auth_whitelist(settings)
+qbittorrent.set_many(qbittorrent.settings_env(settings))

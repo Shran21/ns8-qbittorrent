@@ -65,7 +65,10 @@
     "type": "Invalid value type",
     "minimum": "Value is too small",
     "maximum": "Value is too large",
-    "required": "Required"
+    "required": "Required",
+    "auth_whitelist": "Trusted networks (no password)",
+    "auth_whitelist_helper": "Comma separated subnets in CIDR notation, for instance 192.168.0.0/24. Clients in these networks reach the WebUI without logging in. Leave empty to always require a password.",
+    "auth_whitelist_invalid": "Must be a comma separated list of subnets, like 192.168.0.0/24"
   },
   "about": {
     "title": "About"
