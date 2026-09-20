@@ -19,6 +19,7 @@
 
 import os
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -60,7 +61,29 @@ def migrate_config(legacy_config_dir):
           file=sys.stderr)
     # The legacy directory is left in place on purpose: it is the only copy
     # of the old configuration, and removing it is the administrator's call.
-    shutil.copytree(legacy_config_dir, mountpoint, dirs_exist_ok=True, symlinks=True)
+    shutil.copytree(legacy_config_dir, mountpoint, dirs_exist_ok=True,
+                    symlinks=True, ignore=skip_special_files)
+
+
+def skip_special_files(src, names):
+    """Tell copytree to leave sockets, fifos and device nodes alone.
+
+    copytree copies every entry with copy2, which opens the source: on a
+    unix socket that fails with ENXIO and aborts the whole copy.
+    qBittorrent keeps a live ipc-socket next to its configuration and
+    recreates it on every start, so there is nothing to preserve.
+    """
+    skipped = set()
+    for name in names:
+        try:
+            mode = os.lstat(os.path.join(src, name)).st_mode
+        except OSError:
+            skipped.add(name)  # vanished mid-copy, or unreadable
+            continue
+        if not (stat.S_ISREG(mode) or stat.S_ISDIR(mode) or stat.S_ISLNK(mode)):
+            print(f"Skipping special file {os.path.join(src, name)}", file=sys.stderr)
+            skipped.add(name)
+    return skipped
 
 
 def main():
